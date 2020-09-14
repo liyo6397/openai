@@ -1,4 +1,15 @@
-#Folder 
+#System
+.DS_Store
+.idea/
+script/.DS_Store
+
+#Folder
 practice/*
 venv/*
 key_paper/*
+script/videos/
+spinningup/
+
+#File
+azure_learning.py
+config.json

@@ -76,11 +76,11 @@ class Agent:
 
             target = self.q_network.predict(state)
 
-            if done:
-                target[0][action] = reward
-            else:
-                tar = self.q_target_network.predict(next_state)
-                target[0][action] = reward + self.discount_factor*np.amax(tar)
+            #if done:
+                #target[0][action] = reward
+            #else:
+            tar = self.q_target_network.predict(next_state)
+            target[0][action] = reward + self.discount_factor*np.amax(tar)
 
             self.q_network.fit(state, target, epochs= 1, verbose= 0)
 
@@ -90,7 +90,7 @@ class Agent:
     def alighn_target_model(self):
         self.q_target_network.set_weights(self.q_network.get_weights())
 
-class DQNetwork:
+class doubleDQNetwork:
 
     def __init__(self, agent):
 
@@ -102,9 +102,12 @@ class DQNetwork:
 
     def train(self, episodes, timesteps_per_episode, print_interval, batch_size):
 
+        episode_rewards = []
+
         for epoh in range(episodes):
             state = self.env.reset()
             state = np.reshape(state, [1,1])
+            episode_reward = 0
 
             done = False
 
@@ -118,24 +121,31 @@ class DQNetwork:
 
                 next_state, reward, done, info = self.env.step(action)
 
+                episode_reward += reward
+
                 next_state = np.reshape(next_state, [1,1])
                 self.agent.store(state, action, reward, next_state, done)
 
                 state = next_state
 
-                if done:
-                    self.agent.alighn_target_model()
-                    break
+
+
 
                 if len(self.agent.expirience_replay) > batch_size:
                     self.agent.retrain(batch_size)
+                self.agent.alighn_target_model()
 
                 if step % 10 == 0:
                     bar.update(step / 10 + 1)
 
+                if done or step == timesteps_per_episode-1:
+                    episode_rewards.append(episode_reward)
+                    print("Episodes: {}".format(epoh + 1)+str(episode_reward))
+                    break
+
             bar.finish()
             if (epoh+1) % print_interval == 0:
-                print("Episodes: {}".format(epoh + 1))
+                print("Episodes {}: ".format(epoh + 1))
                 env.render()
 
 
@@ -152,6 +162,7 @@ class DQNetwork:
             observation, reward, done, _ = env.step(action)
             steps += 1
             rewards += reward
+        env.close()
         print("Testing steps: {} rewards {}: ".format(steps, rewards))
 
 
@@ -166,9 +177,11 @@ if __name__ ==  '__main__':
     optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
     agent = Agent(env, optimizer)
 
-    QL = DQNetwork(agent)
+    QL = doubleDQNetwork(agent)
 
     QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
+    QL.make_video(env, agent)
+
 
 
 

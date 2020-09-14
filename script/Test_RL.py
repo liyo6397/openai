@@ -1,5 +1,6 @@
 import unittest
 from DQN import Agent, DQNetwork
+from DoubleDQN import doubleDQNetwork
 import gym
 import numpy as np
 import tensorflow as tf
@@ -9,7 +10,7 @@ import tensorflow as tf
 
 
 class Test_Qlearning(unittest.TestCase):
-
+:::
 
 
     def test_Qnetwork(self):
@@ -78,18 +79,19 @@ class Test_Qlearning(unittest.TestCase):
     def test_video(self):
 
         episodes = 100
-        timesteps_per_episode = 100
+        timesteps_per_episode = 50
         print_interval = 10
-        batch_size = 32
+        batch_size = 10
 
         env = gym.make("Taxi-v3")
         optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
         agent = Agent(env, optimizer)
 
-        QL = DQNetwork(agent)
+        QL = doubleDQNetwork(agent)
+        QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
         QL.make_video(env, agent)
 
-        #QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
+
 
 
 
