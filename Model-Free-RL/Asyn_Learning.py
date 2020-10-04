@@ -22,25 +22,29 @@ Policies
 class A3C:
     def __init__(self, env, state):
 
-        self.state = state
+        self.states = state
         self.n_state, self.n_act = env.observation_space.n, env.action_space.n
 
-    def network(self, hidden_sizes=(32,), activation='tanh', output_activation=None):
+    def network(self, inputs, hidden_sizes=(32,), activation='tanh', output_activation=None):
 
-        model = Sequential()
+        '''model = Sequential()
         model.add(tf.keras.Input(shape=(self.n_state,)))
         for h in hidden_sizes[:-1]:
             model.add(Dense(h, activation=activation))
         model.add(Dense(hidden_sizes[-1], activation=output_activation))
-        #return model.add(Dense(32, activation=output_activation))
-        '''model.add(tf.keras.Input(shape=(16,)))
-        model.add(tf.keras.layers.Dense(32, activation='relu'))
-        # Now the model will take as input arrays of shape (None, 16)
-        # and output arrays of shape (None, 32).
-        # Note that after the first layer, you don't need to specify
-        # the size of the input anymore:
-        model.add(tf.keras.layers.Dense(32))'''
-        return model
+        return model'''
+
+        #layer = tf.keras.Input(shape=(inputs,))
+        layer = Dense(self.n_state, activation=activation)(inputs)
+        for h in hidden_sizes[1:-1]:
+            layer = Dense(h, activation=activation)(layer)
+        layer = Dense(hidden_sizes[-1], activation=output_activation)(layer)
+
+        print("Output Size: ", hidden_sizes[-1])
+
+        return layer
+
+
 
     def gaussian_likelihood(self, x, mu, log_std):
         pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + EPS)) ** 2 + 2 * log_std + np.log(2 * np.pi))
@@ -57,22 +61,24 @@ class A3C:
         all_kls = tf.reduce_sum(pre_sum, axis=1)
         return tf.reduce_mean(all_kls)
 
-    def LogStd(self):
+    def data_std(self):
         log_std_ini = tf.Variable(-0.5 * np.ones(self.n_act, dtype=np.float32))
         log_std = log_std_ini.read_value()
 
-        return log_std
+        std = tf.exp(log_std)
 
-
+        return std, log_std
 
 
     def gaussian_policy(self, a, last_a, hidden_sizes, activation, output_activation):
 
-        mu = self.network(list(hidden_sizes)+[self.n_act], activation, output_activation)
-        log_std = self.LogStd()
-        std = tf.exp(log_std)
+        inputs = np.reshape(self.states, [1,1])
+        mu = self.network(inputs, list(hidden_sizes)+[self.n_act], activation, output_activation)
+        std, log_std = self.data_std()
         #Sample actions from policy given states
         pi = mu + tf.random.normal(tf.shape(mu)) * std
+
+        #Gives log probability, according to the policy, of taking actions a in states
         logp = self.gaussian_likelihood(a, mu, log_std)
         logp_pi = self.gaussian_likelihood(pi, mu, log_std)
 

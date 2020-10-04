@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from Asyn_Learning import A3C
 #import universe # register the universe environments
+from tensorflow.keras.layers import Dense, Embedding, Reshape
 
 
 
@@ -101,25 +102,84 @@ class Test_AsynLearning(unittest.TestCase):
         state = env.reset()
 
         a3c = A3C(env, state)
+        hidden_sizes = (4, 4)
+        activation = tf.tanh
+        output_activation = None
+
+        inputs = tf.ones((3,3))
+        mu = a3c.network(inputs, hidden_sizes, activation, output_activation)
+        print("mu: ",mu)
+
+    def test_mu(self):
+
+        env = gym.make("Taxi-v3")
+        states = env.reset()
+
+        a3c = A3C(env, states)
         hidden_sizes = (32, 32)
         activation = tf.tanh
         output_activation = None
 
-        model = a3c.network(hidden_sizes, activation, output_activation)
+        inputs = np.reshape(states, [1,1])
+        mu = a3c.network(inputs, list(hidden_sizes)+[env.action_space.n], activation, output_activation)
 
-        #print("mu: ",mu)
-        print("model shape: ", model.output_shape)
+        print(mu)
 
-    def test_logstd(self):
+
+
+    def test_data_logstd(self):
         env = gym.make("Taxi-v3")
         state = env.reset()
 
         a3c = A3C(env, state)
 
-        log_std = a3c.LogStd()
+        std, log_std = a3c.data_std()
 
-        #print("mu: ",mu)
+        print("shape: ", std.shape)
+        print("std: ",std)
         print("Log std: ", log_std)
+
+    def test_pi(self):
+
+        env = gym.make("Taxi-v3")
+        states = env.reset()
+
+        a3c = A3C(env, states)
+        hidden_sizes = (32, 32)
+        activation = tf.tanh
+        output_activation = None
+
+        inputs = np.reshape(states, [1, 1])
+        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
+        std, log_std = a3c.data_std()
+
+        pi = mu + tf.random.normal(tf.shape(mu)) * std
+
+        print("pi: ", pi)
+
+    def test_gaussian_liklihood(self):
+
+        env = gym.make("Taxi-v3")
+        states = env.reset()
+
+        action = env.action_space.sample()
+
+        a3c = A3C(env, states)
+        hidden_sizes = (32, 32)
+        activation = tf.tanh
+        output_activation = None
+
+        inputs = np.reshape(states, [1,1])
+        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
+        std, log_std = a3c.data_std()
+        pi = mu + tf.random.normal(tf.shape(mu)) * std
+
+        logp = a3c.gaussian_likelihood(action, mu, log_std)
+        log_pi = a3c.gaussian_likelihood(inputs, mu, log_std)
+
+        print("log_p: ", logp)
+        print("log_pi: ", log_pi)
+
 
 
 
