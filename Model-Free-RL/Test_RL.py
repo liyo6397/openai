@@ -175,14 +175,30 @@ class Test_AsynLearning(unittest.TestCase):
         pi = mu + tf.random.normal(tf.shape(mu)) * std
 
         logp = a3c.gaussian_likelihood(action, mu, log_std)
-        log_pi = a3c.gaussian_likelihood(inputs, mu, log_std)
+        log_pi = a3c.gaussian_likelihood(pi, mu, log_std)
 
+        print("action: ", action)
         print("log_p: ", logp)
         print("log_pi: ", log_pi)
 
 
+    def test_diagonal_gaussian_kl(self):
+        env = gym.make("Taxi-v3")
+        states = env.reset()
 
+        action = env.action_space.sample()
 
+        a3c = A3C(env, states)
+        hidden_sizes = (32, 32)
+        activation = tf.tanh
+        output_activation = None
+
+        inputs = np.reshape(states, [1, 1])
+        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
+        std, log_std = a3c.data_std()
+        pi = mu + tf.random.normal(tf.shape(mu)) * std
+
+        d_kl = self.diagonal_gaussian_kl(mu, log_std, old_mu, old_log_std)
 
     def test_mlp_gaussian_policy(self):
 
