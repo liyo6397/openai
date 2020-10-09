@@ -218,18 +218,3 @@ class Test_AsynLearning(unittest.TestCase):
         print("logp: ", logp_pi)
         print("logp_pi: ", logp_pi)
         print("d_kl: ", d_kl)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
