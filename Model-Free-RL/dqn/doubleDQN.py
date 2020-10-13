@@ -3,7 +3,8 @@ import tensorflow as tf
 import gym
 import random
 from collections import deque
-from tensorflow.keras import Model, Sequential
+from tensorflow.keras import Sequential
+from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam, RMSprop
 
@@ -19,6 +20,7 @@ class doubleDQN:
         self.epsilon = 0.1
         self.expirience_replay = deque(maxlen=2000)
         self.optimizer = optimizer
+        self.record = []
 
         # Q table
         self.discount_factor = 0.6  # discount factor
@@ -28,22 +30,40 @@ class doubleDQN:
         self.learning_rate = 0.00
         self.q_network = self.network()
 
+
         #DQN type
 
         self.q_target_network = self.network()
 
 
 
-    def network(self):
+    def network(self, units=24):
 
         # Neural Net for Deep-Q learning Model
         model = Sequential()
-        model.add(Dense(24, input_dim=self.n_state, activation='relu'))
-        model.add(Dense(24, activation='relu'))
+        model.add(Dense(units=units, activation='relu', input_shape=(1,)))
+        model.add(Dense(units=units, activation='relu'))
         model.add(Dense(self.n_act, activation='linear'))
         model.compile(loss='mse',
                       optimizer=Adam(lr=self.learning_rate))
         return model
+
+    def network2(self,units=24):
+
+        #try:
+        #inputs = tf.keras.Input(shape=(self.n_state))
+        #except:
+        inputs = tf.keras.Input(shape=(1,))
+
+        outputs = Dense(units=units, activation='relu')(inputs)
+        outputs = Dense(units=units, activation='relu')(outputs)
+        outputs = Dense(self.n_act, activation='linear')(outputs)
+
+        model = Model(inputs, outputs)
+        model.compile(optimizer=Adam(lr=self.learning_rate),loss='mse')
+
+        return model
+
 
 
     def get_action(self, state):
@@ -84,6 +104,9 @@ class doubleDQN:
             state = self.env.reset()
             state = np.reshape(state, [1, 1])
 
+            epoh_reward = []
+            time_score = 0
+
             done = False
 
             for step in range(timesteps_per_episode):
@@ -96,10 +119,12 @@ class doubleDQN:
                 self.store(state, action, reward, next_state, done)
 
                 state = next_state
+                epoh_reward.append(reward)
+                time_score += 1
 
                 if done:
                     self.update_target_model()
-                    print("episode number: ", epoh,", reward: ",r , "time score: ", t)
+                    print("episode number: ", epoh,", reward: ",epoh_reward , "time score: ", time_score)
                     break
 
                 if len(self.expirience_replay) > batch_size:
@@ -110,3 +135,14 @@ class doubleDQN:
             if (epoh + 1) % print_interval == 0:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
+
+    def record_info(self, epoh, reward, time_score):
+
+        self.record.append((epoh, reward, time_score))
+
+
+
+
+
+
+

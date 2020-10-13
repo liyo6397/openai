@@ -106,3 +106,5 @@ class DQN:
             if (epoh + 1) % print_interval == 0:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
+
+
