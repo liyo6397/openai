@@ -1,17 +1,17 @@
 import unittest
-from DQN import Agent, DQNetwork
-from DoubleDQN import doubleDQNetwork
+#from DQN import Agent, DQNetwork
+from doubleDQN import doubleDQN
 import gym
 import numpy as np
 import tensorflow as tf
-from Asyn_Learning import A3C
-#import universe # register the universe environments
-from tensorflow.keras.layers import Dense, Embedding, Reshape
-
-
-
 
 class Test_Qlearning(unittest.TestCase):
+
+    def setUp(self):
+
+        self.env = gym.make("Taxi-v3")
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
+        self.dqn = doubleDQN(self.env, self.optimizer)
 
 
     def test_Qnetwork(self):
@@ -20,35 +20,31 @@ class Test_Qlearning(unittest.TestCase):
         print_interval = 10
         env = gym.make("Taxi-v3")
         optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
-        QL = Agent(env, optimizer)
+        QL = doubleDQN(env, optimizer)
 
-        model = QL.network()
-        #env = gym.make("Taxi-v3")
-        #state = env.reset()
+        model = QL.network2()
+        print("Model built: ")
+        print(model.summary())
 
-        state = np.arange(32)
+    def test_predict(self):
 
-        q_values = model.predict(state)
+        states = self.env.reset()
+        print("states: ", states)
+        states = np.reshape(states, [1, 1])
 
-        print("Q values: ", q_values)
-
-    def test_action(self):
-        episodes = 100
-        print_interval = 10
-        QL = Agent()
-
-        state = np.arange(15)
-
-        action = QL.q_network.predict(state)
+        q_network = self.dqn.network2()
+        action = q_network.predict(states)
 
         print("Action: ", action)
-        print(action.shape)
+
+
 
     def test_expReplay(self):
+        env = gym.make("Taxi-v3")
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
+        QL = doubleDQN(env, optimizer)
 
-        agent = Agent()
-
-        print(agent.expirience_replay)
+        print(QL.expirience_replay)
 
     def test_timestep_episode(self):
 
@@ -58,11 +54,11 @@ class Test_Qlearning(unittest.TestCase):
         batch_size = 32
 
         env = gym.make("Taxi-v3")
-        optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
-        agent = Agent(env,optimizer)
+        optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.1)
 
 
-        QL = DQNetwork(agent)
+
+        QL = doubleDQN(env, optimizer)
 
         QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
 
@@ -89,132 +85,8 @@ class Test_Qlearning(unittest.TestCase):
         env = gym.make("Taxi-v3")
         #env = gym.make('FrozenLake-v0')
         optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
-        agent = Agent(env, optimizer)
+        #agent = Agent(env, optimizer)
 
-        QL = doubleDQNetwork(agent)
+        QL = doubleDQN(env, optimizer)
         QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
-        QL.make_video(env, agent)
 
-class Test_AsynLearning(unittest.TestCase):
-
-    def test_network(self):
-        env = gym.make("Taxi-v3")
-        state = env.reset()
-
-        a3c = A3C(env, state)
-        hidden_sizes = (4, 4)
-        activation = tf.tanh
-        output_activation = None
-
-        inputs = tf.ones((3,3))
-        mu = a3c.network(inputs, hidden_sizes, activation, output_activation)
-        print("mu: ",mu)
-
-    def test_mu(self):
-
-        env = gym.make("Taxi-v3")
-        states = env.reset()
-
-        a3c = A3C(env, states)
-        hidden_sizes = (32, 32)
-        activation = tf.tanh
-        output_activation = None
-
-        inputs = np.reshape(states, [1,1])
-        mu = a3c.network(inputs, list(hidden_sizes)+[env.action_space.n], activation, output_activation)
-
-        print(mu)
-
-
-
-    def test_data_logstd(self):
-        env = gym.make("Taxi-v3")
-        state = env.reset()
-
-        a3c = A3C(env, state)
-
-        std, log_std = a3c.data_std()
-
-        print("shape: ", std.shape)
-        print("std: ",std)
-        print("Log std: ", log_std)
-
-    def test_pi(self):
-
-        env = gym.make("Taxi-v3")
-        states = env.reset()
-
-        a3c = A3C(env, states)
-        hidden_sizes = (32, 32)
-        activation = tf.tanh
-        output_activation = None
-
-        inputs = np.reshape(states, [1, 1])
-        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
-        std, log_std = a3c.data_std()
-
-        pi = mu + tf.random.normal(tf.shape(mu)) * std
-
-        print("pi: ", pi)
-
-    def test_gaussian_liklihood(self):
-
-        env = gym.make("Taxi-v3")
-        states = env.reset()
-
-        action = env.action_space.sample()
-
-        a3c = A3C(env, states)
-        hidden_sizes = (32, 32)
-        activation = tf.tanh
-        output_activation = None
-
-        inputs = np.reshape(states, [1,1])
-        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
-        std, log_std = a3c.data_std()
-        pi = mu + tf.random.normal(tf.shape(mu)) * std
-
-        logp = a3c.gaussian_likelihood(action, mu, log_std)
-        log_pi = a3c.gaussian_likelihood(pi, mu, log_std)
-
-        print("action: ", action)
-        print("log_p: ", logp)
-        print("log_pi: ", log_pi)
-
-
-    def test_diagonal_gaussian_kl(self):
-        env = gym.make("Taxi-v3")
-        states = env.reset()
-
-        action = env.action_space.sample()
-
-        a3c = A3C(env, states)
-        hidden_sizes = (32, 32)
-        activation = tf.tanh
-        output_activation = None
-
-        inputs = np.reshape(states, [1, 1])
-        mu = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
-        std, log_std = a3c.data_std()
-        pi = mu + tf.random.normal(tf.shape(mu)) * std
-
-        d_kl = self.diagonal_gaussian_kl(mu, log_std, old_mu, old_log_std)
-
-    def test_mlp_gaussian_policy(self):
-
-        env = gym.make("Taxi-v3")
-        state = env.reset()
-
-        a3c = A3C(env,state)
-        action = env.action_space
-        last_action = None
-        hidden_sizes = (32, 32)
-        activation = tf.tanh
-        output_activation = None
-
-        pi, logp, logp_pi, info, info_phs, d_kl = a3c.gaussian_policy(action, last_action, hidden_sizes, activation, output_activation)
-
-        print("pi: ", pi)
-        print("logp: ", logp_pi)
-        print("logp_pi: ", logp_pi)
-        print("d_kl: ", d_kl)
