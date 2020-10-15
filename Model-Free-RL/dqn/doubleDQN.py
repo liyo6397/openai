@@ -8,6 +8,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam, RMSprop
 
+import progressbar
+
 
 class doubleDQN:
 
@@ -29,10 +31,6 @@ class doubleDQN:
         #Network
         self.learning_rate = 0.00
         self.q_network = self.network()
-
-
-        #DQN type
-
         self.q_target_network = self.network()
 
 
@@ -91,7 +89,7 @@ class doubleDQN:
 
 
 
-            self.q_network.fit(state, target, epochs= 1, verbose= 0)
+            self.q_network.fit(state, target, verbose= 0)
 
     def store(self, state, action, reward, next_state, done):
         self.expirience_replay.append((state, action, reward, next_state, done))
@@ -99,7 +97,7 @@ class doubleDQN:
     def update_target_model(self):
         self.q_target_network.set_weights(self.q_network.get_weights())
 
-    def train(self, episodes, timesteps_per_episode, print_interval, batch_size):
+    def train(self, episodes, max_actions, print_interval, batch_size):
         for epoh in range(episodes):
             state = self.env.reset()
             state = np.reshape(state, [1, 1])
@@ -109,7 +107,11 @@ class doubleDQN:
 
             done = False
 
-            for step in range(timesteps_per_episode):
+            bar = progressbar.ProgressBar(max_value=max_actions / 10,
+                                          widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+            bar.start()
+
+            for step in range(max_actions):
 
                 action = self.get_action(state)
 
@@ -124,14 +126,21 @@ class doubleDQN:
 
                 if done:
                     self.update_target_model()
-                    print("episode number: ", epoh,", reward: ",epoh_reward , "time score: ", time_score)
+                    ave_reward = np.mean(epoh_reward)
+                    print("episode number: ", epoh,", reward: ",ave_reward , "time score: ", time_score)
+                    self.record_info(epoh, reward, time_score)
                     break
 
                 if len(self.expirience_replay) > batch_size:
                     self.retrain(batch_size)
 
+                if (step % 50 )==0 and step>0:
+                    self.update_target_model()
 
 
+
+
+            bar.finish()
             if (epoh + 1) % print_interval == 0:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
