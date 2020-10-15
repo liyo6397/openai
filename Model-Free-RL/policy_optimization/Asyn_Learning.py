@@ -37,6 +37,7 @@ class actor_critic:
         return layer
 
 
+
     def gaussian_likelihood(self, x, mu, log_std):
         pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + EPS)) ** 2 + 2 * log_std + np.log(2 * np.pi))
         return tf.reduce_sum(pre_sum, axis=1)
@@ -63,5 +64,6 @@ class actor_critic:
         prob_pi = tf.reduce_sum(tf.one_hot(pi, depth=self.n_act) * prob, axis=1)
 
         return pi, prob_pi
+
 
 
