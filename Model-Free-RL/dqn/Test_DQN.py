@@ -4,6 +4,7 @@ from doubleDQN import doubleDQN
 import gym
 import numpy as np
 import tensorflow as tf
+import progressbar
 
 class Test_Qlearning(unittest.TestCase):
 
@@ -37,14 +38,14 @@ class Test_Qlearning(unittest.TestCase):
 
         print("Action: ", action)
 
+    def test_get_action(self):
 
+        state = self.env.reset()
+        state = np.reshape(state, [1, 1])
 
-    def test_expReplay(self):
-        env = gym.make("Taxi-v3")
-        optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
-        QL = doubleDQN(env, optimizer)
+        action = self.dqn.get_action(state)
 
-        print(QL.expirience_replay)
+        print(action)
 
     def test_timestep_episode(self):
 
@@ -53,14 +54,8 @@ class Test_Qlearning(unittest.TestCase):
         print_interval = 10
         batch_size = 32
 
-        env = gym.make("Taxi-v3")
-        optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.1)
 
-
-
-        QL = doubleDQN(env, optimizer)
-
-        QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
+        self.dqn.train(episodes, timesteps_per_episode, print_interval, batch_size)
 
     def test_gym(self):
 
@@ -89,4 +84,5 @@ class Test_Qlearning(unittest.TestCase):
 
         QL = doubleDQN(env, optimizer)
         QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
+
 

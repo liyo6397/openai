@@ -32,12 +32,12 @@ class DQN:
 
 
 
-    def network(self):
+    def network(self, units=24):
 
         # Neural Net for Deep-Q learning Model
         model = Sequential()
-        model.add(Dense(24, input_dim=self.n_state, activation='relu'))
-        model.add(Dense(24, activation='relu'))
+        model.add(Dense(units=units, activation='relu', input_shape=(1,)))
+        model.add(Dense(units=units, activation='relu'))
         model.add(Dense(self.n_act, activation='linear'))
         model.compile(loss='mse',
                       optimizer=Adam(lr=self.learning_rate))
