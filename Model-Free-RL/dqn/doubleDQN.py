@@ -7,8 +7,11 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam, RMSprop
+from NNetwork import DeepNN_model
+
 
 import progressbar
+from record import summary
 
 
 class doubleDQN:
@@ -30,12 +33,15 @@ class doubleDQN:
 
         #Network
         self.learning_rate = 0.00
-        self.q_network = self.network()
-        self.q_target_network = self.network()
+        self.q_network = DeepNN_model(self.n_act)
+        self.q_target_network = DeepNN_model(self.n_act)
+
+        #Summary
+        self.record = summary()
 
 
 
-    def network(self, units=24):
+    def old_network(self, units=24):
 
         # Neural Net for Deep-Q learning Model
         model = Sequential()
@@ -46,7 +52,7 @@ class doubleDQN:
                       optimizer=Adam(lr=self.learning_rate))
         return model
 
-    def network2(self,units=24):
+    def network(self,units=24):
 
         #try:
         #inputs = tf.keras.Input(shape=(self.n_state))
@@ -64,8 +70,22 @@ class doubleDQN:
 
 
 
-    def get_action(self, state):
-        if random.uniform(0, 1) <= self.epsilon:
+
+    def get_eps(self, total_step):
+
+        if total_step > 10**4:
+            epsilon = 0.1
+        else:
+            epsilon = 0.01
+
+        return epsilon
+
+
+
+
+    def get_action(self, state, eps):
+
+        if random.uniform(0, 1) <= eps:
             return self.env.action_space.sample()  # Explore action space
 
         q_values = self.q_network.predict(state)  # exploit action space
@@ -77,15 +97,16 @@ class doubleDQN:
 
         minibatch = random.sample(self.expirience_replay, batch_size)
 
-        for state, action, reward, done, next_state in minibatch:
+        with tf.GradientTape as tape:
+            for state, action, reward, done, next_state in minibatch:
 
-            target = self.q_network.predict(state)
+                target = self.q_network.predict(state)
 
-            if done:
-                target[0][action] = reward
-            else:
-                tar = self.q_target_network.predict(next_state)
-                target[0][action] = reward + self.discount_factor*np.amax(tar)
+                if done:
+                    target[0][action] = reward
+                else:
+                    tar = self.q_target_network.predict(next_state)
+                    target[0][action] = reward + self.discount_factor*np.amax(tar)
 
 
 
@@ -97,12 +118,16 @@ class doubleDQN:
     def update_target_model(self):
         self.q_target_network.set_weights(self.q_network.get_weights())
 
-    def train(self, episodes, max_actions, print_interval, batch_size):
-        for epoh in range(episodes):
+    def train(self, num_iterations, max_actions, print_interval, batch_size):
+
+        latest_score = deque(maxlen=50)
+        episode = 0
+        total_step = 0
+        for epoh in range(num_iterations):
             state = self.env.reset()
             state = np.reshape(state, [1, 1])
 
-            epoh_reward = []
+            episode_reward = 0
             time_score = 0
 
             done = False
@@ -113,7 +138,8 @@ class doubleDQN:
 
             for step in range(max_actions):
 
-                action = self.get_action(state)
+                eps = self.get_eps(total_step)
+                action = self.get_action(state, eps)
 
                 next_state, reward, done, info = self.env.step(action)
 
@@ -121,33 +147,32 @@ class doubleDQN:
                 self.store(state, action, reward, next_state, done)
 
                 state = next_state
-                epoh_reward.append(reward)
+                episode_reward += reward
                 time_score += 1
 
                 if done:
+                    episode += 1
+                    latest_score.append(episode_reward)
                     self.update_target_model()
-                    ave_reward = np.mean(epoh_reward)
-                    print("episode number: ", epoh,", reward: ",ave_reward , "time score: ", time_score)
-                    self.record_info(epoh, reward, time_score)
+                    ave_reward = np.mean(latest_score)
+                    print("episode number: ", episode,", latest average reward: ",ave_reward , "time score: ", time_score)
+                    self.record.write_summary(episode, episode_reward, latest_score, total_step,eps)
                     break
 
                 if len(self.expirience_replay) > batch_size:
                     self.retrain(batch_size)
 
-                if (step % 50 )==0 and step>0:
+                if (total_step % 50 )==0 and step>0:
                     self.update_target_model()
 
-
-
+                total_step += 1
 
             bar.finish()
             if (epoh + 1) % print_interval == 0:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
 
-    def record_info(self, epoh, reward, time_score):
 
-        self.record.append((epoh, reward, time_score))
 
 
 
