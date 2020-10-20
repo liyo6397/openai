@@ -49,13 +49,13 @@ class Test_Qlearning(unittest.TestCase):
 
     def test_timestep_episode(self):
 
-        episodes = 100
-        timesteps_per_episode = 50
+        iterations = 100
+        max_actions = 50
         print_interval = 10
         batch_size = 32
 
 
-        self.dqn.train(episodes, timesteps_per_episode, print_interval, batch_size)
+        self.dqn.train(iterations, max_actions, print_interval, batch_size)
 
     def test_gym(self):
 
@@ -73,7 +73,7 @@ class Test_Qlearning(unittest.TestCase):
     def test_video(self):
 
         episodes = 100
-        timesteps_per_episode = 50
+        max_action = 500
         print_interval = 10
         batch_size = 10
 
@@ -83,6 +83,6 @@ class Test_Qlearning(unittest.TestCase):
         #agent = Agent(env, optimizer)
 
         QL = doubleDQN(env, optimizer)
-        QL.train(episodes, timesteps_per_episode, print_interval, batch_size)
+        QL.train(episodes, max_action, print_interval, batch_size)
 
 

@@ -1,8 +1,9 @@
 import tensorflow as tf
 import datetime
 import os
+import numpy as np
 
-class Record:
+class summary:
 
     def __init__(self):
 
