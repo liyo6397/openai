@@ -33,7 +33,7 @@ class Test_Qlearning(unittest.TestCase):
         print("states: ", states)
         states = np.reshape(states, [1, 1])
 
-        q_network = self.dqn.network2()
+        q_network = self.dqn.network()
         action = q_network.predict(states)
 
         print("Action: ", action)
@@ -84,5 +84,16 @@ class Test_Qlearning(unittest.TestCase):
 
         QL = doubleDQN(env, optimizer)
         QL.train(episodes, max_action, print_interval, batch_size)
+
+    def test_NNclass(self):
+
+        state = self.env.reset()
+        state = np.reshape(state, [1, 1])
+
+        model = self.dqn.q_network
+        q_val = model(state)
+        print("Model: ", model)
+        print("Q values:", q_val)
+
 
 

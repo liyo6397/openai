@@ -4,14 +4,22 @@ from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam, RMSprop
 
-def DeepNN_model(n_act, units=24):
-    inputs = tf.keras.Input(shape=(1,))
+class Networks():
 
-    outputs = Dense(units=units, activation='relu')(inputs)
-    outputs = Dense(units=units, activation='relu')(outputs)
-    outputs = Dense(n_act, activation='linear')(outputs)
+    def __init__(self, n_act, units=24):
+        #super().__init__()
+        self.n_act = n_act
 
-    model = Model(inputs, outputs)
-    model.compile(optimizer=Adam, loss='mse')
+    def DeepNN_model(self, units=24):
+        inputs = tf.keras.Input(shape=(1,))
 
-    return model
+        outputs = Dense(units=units, activation='relu')(inputs)
+        outputs = Dense(units=units, activation='relu')(outputs)
+        outputs = Dense(self.n_act, activation='linear')(outputs)
+
+        model = Model(inputs, outputs)
+        #model.compile(optimizer=Adam, loss='mse')
+
+        return model
+
+
