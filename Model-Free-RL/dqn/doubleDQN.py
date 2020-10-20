@@ -7,7 +7,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam, RMSprop
-from NNetwork import DeepNN_model
+from NNetwork import Networks
 
 
 import progressbar
@@ -33,8 +33,9 @@ class doubleDQN:
 
         #Network
         self.learning_rate = 0.00
-        self.q_network = DeepNN_model(self.n_act)
-        self.q_target_network = DeepNN_model(self.n_act)
+        self.net = Networks(self.n_act)
+        self.q_network = self.net.DeepNN_model()
+        self.q_target_network = self.net.DeepNN_model()
 
         #Summary
         self.record = summary()
@@ -97,20 +98,25 @@ class doubleDQN:
 
         minibatch = random.sample(self.expirience_replay, batch_size)
 
-        with tf.GradientTape as tape:
-            for state, action, reward, done, next_state in minibatch:
 
-                target = self.q_network.predict(state)
+        for state, action, reward, done, next_state in minibatch:
 
-                if done:
-                    target[0][action] = reward
-                else:
-                    tar = self.q_target_network.predict(next_state)
-                    target[0][action] = reward + self.discount_factor*np.amax(tar)
+            target = self.q_network.predict(state)
 
-
+            if done:
+                target[0][action] = reward
+            else:
+                tar = self.q_target_network.predict(next_state)
+                target[0][action] = reward + self.discount_factor*np.amax(tar)
 
             self.q_network.fit(state, target, verbose= 0)
+
+
+
+
+
+
+
 
     def store(self, state, action, reward, next_state, done):
         self.expirience_replay.append((state, action, reward, next_state, done))
