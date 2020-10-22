@@ -1,6 +1,6 @@
 import unittest
-from DQN import Agent, DQNetwork
-from DoubleDQN import doubleDQNetwork
+#from DQN import Agent, DQNetwork
+#from DoubleDQN import doubleDQNetwork
 import gym
 import numpy as np
 import tensorflow as tf

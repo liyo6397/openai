@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam, RMSprop
@@ -10,15 +11,15 @@ class Networks():
         #super().__init__()
         self.n_act = n_act
 
-    def DeepNN_model(self, units=24):
-        inputs = tf.keras.Input(shape=(1,))
 
-        outputs = Dense(units=units, activation='relu')(inputs)
-        outputs = Dense(units=units, activation='relu')(outputs)
-        outputs = Dense(self.n_act, activation='linear')(outputs)
 
-        model = Model(inputs, outputs)
-        #model.compile(optimizer=Adam, loss='mse')
+    def DeepNN_model(self, learning_rate=0.1,units=24):
+
+        # Neural Net for Deep-Q learning Model
+        model = Sequential()
+        model.add(Dense(units=units, activation='relu', input_shape=(1,)))
+        model.add(Dense(units=units, activation='relu'))
+        model.add(Dense(self.n_act, activation='linear'))
 
         return model
 
