@@ -36,6 +36,9 @@ class doubleDQN:
         self.net = Networks(self.n_act)
         self.q_network = self.net.DeepNN_model()
         self.q_target_network = self.net.DeepNN_model()
+        self.loss = tf.keras.losses.Huber()
+        self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
+        self.q_metric = tf.keras.metrics.Mean('Q_values', dtype=tf.float32)
 
         #Summary
         self.record = summary()
@@ -84,7 +87,7 @@ class doubleDQN:
 
 
 
-    def get_action(self, state, eps):
+    def get_action(self, state, eps=0.1):
 
         if random.uniform(0, 1) <= eps:
             return self.env.action_space.sample()  # Explore action space
@@ -93,8 +96,7 @@ class doubleDQN:
         action = np.argmax(q_values[0])
 
         return action
-
-    def retrain(self, batch_size):
+    def retrain_modelFit(self, batch_size):
 
         minibatch = random.sample(self.expirience_replay, batch_size)
 
@@ -103,19 +105,43 @@ class doubleDQN:
 
             target = self.q_network.predict(state)
 
+
             if done:
                 target[0][action] = reward
             else:
                 tar = self.q_target_network.predict(next_state)
                 target[0][action] = reward + self.discount_factor*np.amax(tar)
 
+
+
+
+
             self.q_network.fit(state, target, verbose= 0)
 
+    def retrain_gradientTape(self, batch_size):
+
+        minibatch = random.sample(self.expirience_replay, batch_size)
+
+
+        for state, action, reward, done, next_state in minibatch:
+            with tf.GradientTape() as tape:
+
+                q_model = self.q_network
+                curr_q = q_model.predict(state)
+                expected_q = curr_q
+
+                if done:
+                    expected_q[0][action] = reward
+                else:
+                    target_model = self.q_target_network
+                    tar = target_model.predict(next_state)
+                    expected_q[0][action] = reward + self.discount_factor*np.amax(tar)
 
 
 
-
-
+                loss_values = self.loss(curr_q, expected_q)
+            grades = tape.gradient(loss_values, self.q_network.trainable_variables)
+            self.optimizer.apply_gradients(zip(grades, self.q_network.trainable_variables))
 
 
     def store(self, state, action, reward, next_state, done):
@@ -161,12 +187,14 @@ class doubleDQN:
                     latest_score.append(episode_reward)
                     self.update_target_model()
                     ave_reward = np.mean(latest_score)
-                    print("episode number: ", episode,", latest average reward: ",ave_reward , "time score: ", time_score)
-                    self.record.write_summary(episode, episode_reward, latest_score, total_step,eps)
+                    ave_q = self.q_metric.result()
+                    print("episode number: ", episode,", Average reward: ",ave_reward , "Average Q: ", ave_q)
+                    self.save_info(episode, episode_reward, latest_score, total_step, eps)
+
                     break
 
                 if len(self.expirience_replay) > batch_size:
-                    self.retrain(batch_size)
+                    self.retrain_gradientTape(batch_size)
 
                 if (total_step % 50 )==0 and step>0:
                     self.update_target_model()
@@ -178,7 +206,12 @@ class doubleDQN:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
 
+    def save_info(self, episode, episode_reward, latest_score, total_step, eps):
 
+        self.record.write_summary(episode, episode_reward, latest_score, total_step, eps, self.loss_metric,
+                                  self.q_metric)
+        self.loss_metric.reset_states()
+        self.q_metric.reset_states()
 
 
 

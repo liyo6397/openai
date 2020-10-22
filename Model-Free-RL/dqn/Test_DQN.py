@@ -1,6 +1,8 @@
 import unittest
 #from DQN import Agent, DQNetwork
 from doubleDQN import doubleDQN
+from NNetwork import Networks
+
 import gym
 import numpy as np
 import tensorflow as tf
@@ -33,7 +35,7 @@ class Test_Qlearning(unittest.TestCase):
         print("states: ", states)
         states = np.reshape(states, [1, 1])
 
-        q_network = self.dqn.network()
+        q_network = self.dqn.q_network
         action = q_network.predict(states)
 
         print("Action: ", action)
@@ -94,6 +96,37 @@ class Test_Qlearning(unittest.TestCase):
         q_val = model(state)
         print("Model: ", model)
         print("Q values:", q_val)
+
+    def test_DeepNN_model(self):
+
+        NN = Networks(self.env.action_space.n)
+
+        state = self.env.reset()
+        state = np.reshape(state, [1, 1])
+
+        model = NN.DeepNN_model()
+        raw = model(state)
+        pred = model.predict(state)
+
+        print("Model: ", raw)
+        print("Pred: ", pred)
+
+
+    def test_gradientTape_training(self):
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+        dqn = doubleDQN(self.env, optimizer)
+
+        iterations = 100
+        max_actions = 50
+        print_interval = 10
+        batch_size = 32
+
+        dqn.train(iterations, max_actions, print_interval, batch_size)
+
+
+
+
 
 
 
