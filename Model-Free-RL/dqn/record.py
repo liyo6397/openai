@@ -19,15 +19,15 @@ class summary:
 
         return writer
 
-    def write_summary(self, episode, latest_100_score, episode_score, total_step, eps):
+    def write_summary(self, episode, latest_100_score, episode_score, total_step, eps, loss_metric, q_metric):
 
         with self.writer.as_default():
             tf.summary.scalar("Reward (clipped)", episode_score, step=episode)
             tf.summary.scalar("Latest 100 avg reward (clipped)", np.mean(latest_100_score), step=episode)
-            tf.summary.scalar("Loss", self.loss_metric.result(), step=episode)
-            tf.summary.scalar("Average Q", self.q_metric.result(), step=episode)
+            tf.summary.scalar("Loss", loss_metric.result(), step=episode)
+            tf.summary.scalar("Average Q", q_metric.result(), step=episode)
             tf.summary.scalar("Total Frames", total_step, step=episode)
             tf.summary.scalar("Epsilon", eps, step=episode)
 
-        self.loss_metric.reset_states()
-        self.q_metric.reset_states()
+        #loss_metric.reset_states()
+        #self.q_metric.reset_states()
