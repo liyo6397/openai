@@ -7,21 +7,26 @@ class Worker:
     def __init__(self, name):
         self.name = 'w%02i' % name
 
-    def update_reward(self, a3c, action, reward, done, next_state):
+    def update_reward(self, a3c, rewards, done):
 
         hidden_sizes = (32, 32)
 
         if done:
-            reward = 0
+            total_reward = 0
         else:
             value = a3c.network(list(hidden_sizes) + [1])
-            reward = value
+            total_reward = value
+
+        N = len(rewards)
+        for i in range(N-2,-1):
+            total_reward = rewards[i] + discount_factor*total_reward
 
 
 
 
 
-    def train(self,params, epochs, steps_per_epoch):
+
+    def train(self,params, epochs, max_timesteps):
 
         a3c = actor_critic(params.env, params.state)
         env = params.env
@@ -35,7 +40,9 @@ class Worker:
 
             ep_r = 0
             step = 0
-            while True or step < steps_per_epoch:
+
+            score = []
+            while True or step < max_timesteps:
                 if self.name == 'w00':
                     env.render()
                 action = a3c.sample_DiscreteActions(states, hidden_sizes=(32,32))
@@ -44,7 +51,11 @@ class Worker:
                 buf.experiance_replay(action, reward, states, next_state)
                 step += 1
 
-                reward = self.update_reward(a3c, action, reward, done, next_state)
+                score.append(reward)
+                if done:
+                    break
+
+            reward = self.update_reward(a3c, action, score, done, next_state)
 
 
 

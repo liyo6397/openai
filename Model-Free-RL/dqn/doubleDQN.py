@@ -3,6 +3,8 @@ import tensorflow as tf
 import gym
 import random
 from collections import deque
+import os
+
 from tensorflow.keras import Sequential
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Embedding, Reshape
@@ -41,7 +43,8 @@ class doubleDQN:
         self.q_metric = tf.keras.metrics.Mean('Q_values', dtype=tf.float32)
 
         #Summary
-        self.record = summary()
+        self.writer = self.create_writer()
+        #self.record = summary()
 
 
 
@@ -127,6 +130,7 @@ class doubleDQN:
             with tf.GradientTape() as tape:
 
                 q_model = self.q_network
+                tf_curr_q = q_model(state)
                 curr_q = q_model.predict(state)
                 expected_q = curr_q
 
@@ -137,11 +141,14 @@ class doubleDQN:
                     tar = target_model.predict(next_state)
                     expected_q[0][action] = reward + self.discount_factor*np.amax(tar)
 
+                tf_expected_q = tf.constant(expected_q)
 
-
-                loss_values = self.loss(curr_q, expected_q)
+                loss_values = self.loss(tf_curr_q, tf_expected_q)
             grades = tape.gradient(loss_values, self.q_network.trainable_variables)
             self.optimizer.apply_gradients(zip(grades, self.q_network.trainable_variables))
+
+            self.loss_metric.update_state(loss_values)
+            self.q_metric.update_state(curr_q)
 
 
     def store(self, state, action, reward, next_state, done):
@@ -189,7 +196,7 @@ class doubleDQN:
                     ave_reward = np.mean(latest_score)
                     ave_q = self.q_metric.result()
                     print("episode number: ", episode,", Average reward: ",ave_reward , "Average Q: ", ave_q)
-                    self.save_info(episode, episode_reward, latest_score, total_step, eps)
+                    self.write_summary(episode, episode_reward, latest_score, total_step, eps)
 
                     break
 
@@ -206,14 +213,29 @@ class doubleDQN:
                 print("Episodes: {}".format(epoh + 1))
                 self.env.render()
 
-    def save_info(self, episode, episode_reward, latest_score, total_step, eps):
 
-        self.record.write_summary(episode, episode_reward, latest_score, total_step, eps, self.loss_metric,
-                                  self.q_metric)
+    def create_writer(self, log_dir='logs/'):
+
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
+
+        summary_dir = log_dir+'/summary'
+        writer = tf.summary.create_file_writer(summary_dir)
+
+        return writer
+
+    def write_summary(self, episode, latest_100_score, episode_score, total_step, eps):
+
+        with self.writer.as_default():
+            tf.summary.scalar("Reward (clipped)", episode_score, step=episode)
+            tf.summary.scalar("Latest 100 avg reward (clipped)", np.mean(latest_100_score), step=episode)
+            tf.summary.scalar("Loss", self.loss_metric.result(), step=episode)
+            tf.summary.scalar("Average Q", self.q_metric.result(), step=episode)
+            tf.summary.scalar("Total Frames", total_step, step=episode)
+            tf.summary.scalar("Epsilon", eps, step=episode)
+
         self.loss_metric.reset_states()
         self.q_metric.reset_states()
-
-
 
 
 

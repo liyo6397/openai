@@ -29,5 +29,5 @@ class summary:
             tf.summary.scalar("Total Frames", total_step, step=episode)
             tf.summary.scalar("Epsilon", eps, step=episode)
 
-        #loss_metric.reset_states()
-        #self.q_metric.reset_states()
+        self.loss_metric.reset_states()
+        self.q_metric.reset_states()
