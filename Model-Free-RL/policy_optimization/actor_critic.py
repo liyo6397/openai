@@ -6,31 +6,44 @@ from collections import deque
 from gym import wrappers
 import os
 import time
+
 #tensorflow
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Dense, Embedding, Reshape, Conv2D
 from tensorflow.keras.optimizers import Adam, RMSprop
 from gym.spaces import Box, Discrete
 
+#Model
+from utils import Networks
+
 EPS = 1e-8
 
 
+class A3C:
 
-"""
-Policies
-"""
-class A3C(Model):
-    def policy(self, inputs):
+    def __init__(self):
 
-        inputs = np.reshape(inputs, [1,1])
-        logits = self.network(inputs, list(self.hidden_sizes)+[self.n_act])
-        v = tf.squeeze(self.network(inputs, list(self.hidden_sizes) + [1], output_activation=None), axis=1)
-        pi = tf.squeeze(tf.random.categorical(logits, 1), axis=1)
+        self.env = gym.make("BreakoutNoFrameskip-v4")
+        self.n_act = self.env.action_space.n
+        self.agent_history_length = 4
+        self.net = Networks(self.env, self.agent_history_length)
 
-        pi = tf.nn.softmax(logits)
-        #prob_pi = tf.reduce_sum(tf.one_hot(pi, depth=self.n_act) * prob, axis=1)
 
-        return v, pi
+    def get_policy(self, layer_data):
+
+        logits = Dense(units=self.n_act, activation=None)(layer_data)
+        prob_pi = tf.keras.activations.softmax(logits)
+
+        return prob_pi
+
+
+
+    def critic_value(self, layer_data):
+
+        logits = Dense(units=1, activation=None)(layer_data)
+
+        return logits
+
 
 
 
