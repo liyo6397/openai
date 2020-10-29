@@ -118,8 +118,20 @@ class Test_Qlearning(unittest.TestCase):
         dqn = doubleDQN(self.env, optimizer)
 
         iterations = 100
-        max_actions = 50
+        max_actions = 10000
         print_interval = 10
+        batch_size = 32
+
+        dqn.train(iterations, max_actions, print_interval, batch_size)
+
+    def test_tfSummary(self):
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+        dqn = doubleDQN(self.env, optimizer)
+
+        iterations = 10
+        max_actions = 10
+        print_interval = 1
         batch_size = 32
 
         dqn.train(iterations, max_actions, print_interval, batch_size)

@@ -189,14 +189,14 @@ class doubleDQN:
                 episode_reward += reward
                 time_score += 1
 
-                if done:
+                if done or step == max_actions -1:
                     episode += 1
                     latest_score.append(episode_reward)
                     self.update_target_model()
                     ave_reward = np.mean(latest_score)
                     ave_q = self.q_metric.result()
                     print("episode number: ", episode,", Average reward: ",ave_reward , "Average Q: ", ave_q)
-                    self.write_summary(episode, episode_reward, latest_score, total_step, eps)
+                    self.write_summary(episode, latest_score, episode_reward, total_step, eps)
 
                     break
 

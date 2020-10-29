@@ -1,7 +1,7 @@
 import unittest
 import gym
 import tensorflow as tf
-from util import Networks
+from utils import Networks
 
 
 class Test_util(unittest.TestCase):
@@ -20,7 +20,6 @@ class Test_util(unittest.TestCase):
     def test_forward(self):
 
         state = self.env.reset()
-        #state = np.reshape(state, [1,1])
         state = tf.constant(state, tf.float32)
         recent_state = tf.expand_dims(state, axis=0)
 
@@ -28,4 +27,21 @@ class Test_util(unittest.TestCase):
         logits = self.net.forward(recent_state)
 
         print(logits)
+
+    def test_actor_critic(self):
+
+        state = self.env.reset()
+        state = tf.constant(state, tf.float32)
+        recent_state = tf.expand_dims(state, axis=0)
+
+        logits = self.net.forward(recent_state)
+
+        pi = self.net.get_policy(logits)
+        v = self.net.critic_value(logits)
+
+
+        print("Actor: ",pi)
+        print("Critic: ", v)
+
+
 

@@ -4,17 +4,22 @@ import unittest
 import gym
 import numpy as np
 import tensorflow as tf
-from Asyn_Learning import actor_critic
+
 #import universe # register the universe environments
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 
 class Test_AsynLearning(unittest.TestCase):
 
+    def setUp(self) -> None:
+
+        self.env = gym.make("Taxi-v3")
+        self.a3c = actor_critic(self.env)
+
     def test_network(self):
         env = gym.make("Taxi-v3")
         state = env.reset()
 
-        a3c = actor_critic(env, state)
+        a3c = actor_critic(env)
         hidden_sizes = (4, 4)
         activation = tf.tanh
         output_activation = None
@@ -28,7 +33,7 @@ class Test_AsynLearning(unittest.TestCase):
         env = gym.make("Taxi-v3")
         states = env.reset()
 
-        a3c = actor_critic(env, states)
+        a3c = actor_critic(env)
         hidden_sizes = (32, 32)
         activation = tf.tanh
         output_activation = None
@@ -40,32 +45,21 @@ class Test_AsynLearning(unittest.TestCase):
 
 
 
-    def test_data_logstd(self):
-        env = gym.make("Taxi-v3")
-        state = env.reset()
 
-        a3c = A3C(env, state)
-
-        std, log_std = a3c.data_std()
-
-        print("shape: ", std.shape)
-        print("std: ",std)
-        print("Log std: ", log_std)
 
     def test_pi(self):
 
         env = gym.make("Taxi-v3")
         states = env.reset()
 
-        a3c = actor_critic(env, states)
+        a3c = actor_critic(env)
         hidden_sizes = (32, 32)
         activation = tf.tanh
         output_activation = None
 
         inputs = np.reshape(states, [1, 1])
-        logits = a3c.network(inputs, list(hidden_sizes) + [env.action_space.n], activation, output_activation)
 
-        pi = tf.squeeze(tf.random.categorical(logits, 1), axis=1)
+        a3c.policy(hidden_sizes = (32, 32))
 
         print("pi: ", pi)
 
@@ -113,6 +107,8 @@ class Test_AsynLearning(unittest.TestCase):
         print("logp: ", logp_pi)
         print("logp_pi: ", logp_pi)
         print("d_kl: ", d_kl)
+
+
 
 
 
