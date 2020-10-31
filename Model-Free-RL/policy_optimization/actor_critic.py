@@ -26,23 +26,31 @@ class A3C:
         self.env = gym.make("BreakoutNoFrameskip-v4")
         self.n_act = self.env.action_space.n
         self.agent_history_length = 4
-        self.net = Networks(self.env, self.agent_history_length)
+        self.model = Networks(self.n_act, self.agent_history_length)
 
 
-    def get_policy(self, layer_data):
+    def produce_entropy(self, logits):
 
-        logits = Dense(units=self.n_act, activation=None)(layer_data)
-        prob_pi = tf.keras.activations.softmax(logits)
+        prob = tf.nn.softmax(logits)
+        #labels = [tf.one_hot(prob, depth=self.n_act)]
+        entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob, logits=logits, axis=1)
+        #entropy = tf.reduce_sum(tf.one_hot(pi, depth=self.n_act) * tf.nn.log_softmax(logits), axis=1)
 
-        return prob_pi
+        return entropy
 
 
 
-    def critic_value(self, layer_data):
 
-        logits = Dense(units=1, activation=None)(layer_data)
+    def sample_action(self, actor_val):
 
-        return logits
+        return tf.random.categorical(actor_val, 1)[0, 0]
+
+
+
+
+
+
+
 
 
 
