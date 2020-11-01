@@ -14,7 +14,7 @@ from tensorflow.keras.optimizers import Adam, RMSprop
 from gym.spaces import Box, Discrete
 
 #Model
-from utils import Networks
+from model import Networks
 
 EPS = 1e-8
 
@@ -26,12 +26,12 @@ class A3C:
         self.env = gym.make("BreakoutNoFrameskip-v4")
         self.n_act = self.env.action_space.n
         self.agent_history_length = 4
-        self.model = Networks(self.n_act, self.agent_history_length)
+        #self.model = Networks(self.n_act, self.agent_history_length)
 
 
-    def produce_entropy(self, logits):
+    def produce_entropy(self, logits, prob):
 
-        prob = tf.nn.softmax(logits)
+
         #labels = [tf.one_hot(prob, depth=self.n_act)]
         entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob, logits=logits, axis=1)
         #entropy = tf.reduce_sum(tf.one_hot(pi, depth=self.n_act) * tf.nn.log_softmax(logits), axis=1)
@@ -39,11 +39,15 @@ class A3C:
         return entropy
 
 
+    def sample_action(self, logits):
+
+        prob = tf.nn.softmax(logits)
+        log_prob = tf.nn.log_softmax(logits)
+        action = tf.random.categorical(prob, 1)[0, 0]
 
 
-    def sample_action(self, actor_val):
 
-        return tf.random.categorical(actor_val, 1)[0, 0]
+        return action, prob, log_prob
 
 
 

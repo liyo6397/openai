@@ -12,13 +12,13 @@ def convert_batchTensor(state):
 
     return recent_state
 
-def initial_tensorArray():
+def initial_policyVar():
 
-    action_prob = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+    prob_action = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     rewards = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
-    return action_prob, values, rewards
+    return prob_action, values, rewards
 
 
 

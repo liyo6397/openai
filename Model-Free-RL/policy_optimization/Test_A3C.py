@@ -1,9 +1,9 @@
 import unittest
 import gym
 import tensorflow as tf
-from utils import Networks, convert_batchTensor, initial_state
+from utils import convert_batchTensor, initial_state
 from actor_critic import A3C
-
+from model import Networks
 
 class Test_util(unittest.TestCase):
 
@@ -55,11 +55,13 @@ class Test_util(unittest.TestCase):
 
         a3c = A3C()
 
-        action = a3c.sample_action(logits_a)
+        action, prob, log_prob = a3c.sample_action(logits_a)
 
-        print(logits_a)
+        #print(logits_a)
 
         print(action)
+        #print(prob)
+        print(log_prob)
 
     def test_entropy(self):
 
@@ -67,11 +69,26 @@ class Test_util(unittest.TestCase):
         state = convert_batchTensor(ini_state)
 
         logits_a, logits_c = self.net(state)
+        action, prob, log_prob = self.a3c.sample_action(logits_a)
+        entropy = self.a3c.produce_entropy(logits_a, prob)
 
-        entropy = self.a3c.produce_entropy(logits_a)
-        action = self.a3c.sample_action(logits_a)
 
         print(entropy)
+
+    def test_raw_action(self):
+
+        state = self.env.reset()
+        state = convert_batchTensor(state)
+
+        logits_a, logits_c = self.net(state)
+
+        prob = tf.nn.softmax(logits_a)
+        action = tf.random.categorical(prob, 1)
+        print(action[0,0])
+
+        print(action)
+
+
 
 
 
