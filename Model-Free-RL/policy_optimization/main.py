@@ -28,7 +28,7 @@ if __name__ == "__main__":
     num_action = env.action_space.n
     max_steps_episode = par.max_steps_episode
     running_reward = 0
-    episode = 0
+
 
     #class import
     model = Networks(num_action, agent_history_length=4)
@@ -38,13 +38,13 @@ if __name__ == "__main__":
 
 
     with tqdm.trange(par.num_episodes) as episodes:
-        for t in episodes:
+        for episode in episodes:
             episode_reward = int(a3c_trainer.train_episode(episode))
 
             running_reward = episode_reward * 0.01 + running_reward * .99
 
-            t.set_description(f'Episode {episode}')
-            t.set_postfix(
+            episodes.set_description(f'Episode {episode}')
+            episodes.set_postfix(
                 episode_reward=episode_reward, running_reward=running_reward)
 
             # Show average episode reward every 10 episodes
