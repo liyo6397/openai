@@ -7,9 +7,11 @@ script/.DS_Store
 practice/*
 venv/*
 key_paper/*
-script/videos/
+Model-Free-RL/videos/*
 spinningup/
+Model-Free-RL/simepl_dqn
 
 #File
 azure_learning.py
 config.json
+
