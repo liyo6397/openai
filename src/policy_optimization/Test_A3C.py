@@ -10,10 +10,12 @@ class Test_par:
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
         self.gamma = 0.6
-        self.num_episodes = 10
-        self.max_steps_episode = 10
-        self.learning_rate = 0.1
+        self.num_episodes = 2
+        self.max_steps_episode = 10000
+        self.learning_rate = 0.01
         self.agent_history_length = 4
+        self.reward_threshold = 195
+        self.num_process = 2
 
 
 
@@ -124,7 +126,7 @@ class Test_train(unittest.TestCase):
     def test_run_episode(self):
 
         max_steps = 10
-        prob_a, critic_val, rewards = self.trainer.explore()
+        prob_a, critic_val, rewards = self.trainer.explore(1)
 
         print("Probabilities: ", prob_a)
         print("Critical values: ", critic_val)
@@ -132,7 +134,7 @@ class Test_train(unittest.TestCase):
 
     def test_get_expected_reward(self):
 
-        prob_a, critic_val, rewards = self.trainer.explore()
+        prob_a, critic_val, rewards = self.trainer.explore(1)
 
         exp_rewards = self.a3c.get_expected_rewards(rewards, self.par.gamma)
 
@@ -152,10 +154,23 @@ class Test_train(unittest.TestCase):
                 observation = env.reset()
         env.close()
 
+    def test_tf_env_step(self):
+
+        state = tf.constant(self.env.reset(), dtype=tf.float32)
+        state = utils.insert_axis0Tensor(state)
+        logits_a, critic_val = self.model(state)
+
+        action, prob_a = self.a3c.sample_action(logits_a)
+
+        # Applying action to get next state and reward
+        next_state, reward, done = self.trainer.tf_env_step(action)
+
+        print(reward)
+
     def test_compute_loss(self):
 
         max_steps = 1000
-        prob_a, critic_val, rewards = self.trainer.explore()
+        prob_a, critic_val, rewards = self.trainer.explore(1)
 
         exp_rewards = self.a3c.get_expected_rewards(rewards, self.par.gamma)
 
@@ -165,9 +180,35 @@ class Test_train(unittest.TestCase):
 
     def test_train_episode(self):
 
-        episode_reward = self.trainer.train_episode()
+        episode_reward = self.trainer.run_episode(1)
 
         print(episode_reward)
+
+    def test_main_training(self):
+
+        #self.num_episodes = 1
+        #self.max_steps_episode = 1000
+        self.trainer.train()
+
+    def test_thread(self):
+
+        threads = utils.create_threads(self.trainer, self.par.num_process)
+
+        process = []
+
+        count = 1
+
+        for thread in threads:
+            thread.start()
+
+            process.append(thread)
+            count += 1
+
+
+        # Wait for all threads to complete
+        for t in process:
+            t.join()
+
 
 
 

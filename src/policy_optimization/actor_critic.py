@@ -1,5 +1,10 @@
 import numpy as np
 import tensorflow as tf
+import gym
+import utils
+from PIL import Image
+from pyvirtualdisplay import Display
+
 
 
 EPS = 1e-8
@@ -38,7 +43,7 @@ class A3C:
         #Accumalate the rewards from the end
         rewards = tf.cast(rewards[::-1], dtype=tf.float32)
         for t in tf.range(T):
-            total_reward += rewards[t]+gamma*total_reward
+            total_reward = rewards[t]+gamma*total_reward
             total_reward.set_shape(total_reward_shape)
             exp_rewards = exp_rewards.write(t, total_reward)
         exp_rewards = exp_rewards.stack()[::-1]
@@ -66,6 +71,64 @@ class A3C:
         loss = actor_loss + critic_loss
 
         return loss
+
+class visualization:
+
+    def __init__(self, env: gym.Env):
+
+        self.env = env
+        self.setup_display()
+        self.images = self.setup_images()
+
+    def setup_display(self):
+        display = Display(visible=0, size=(400, 300))
+        display.start()
+
+    def setup_images(self):
+
+        screen = self.env.render(mode='rgb_array')
+
+        # Creates an image memory from an object exporting the array interface
+        im = Image.fromarray(screen)
+        images = [im]
+
+        return images
+
+
+
+    def create_images(self, model: tf.keras.Model, a3c: 'A3C', max_steps_episodes):
+
+
+        state = utils.initial_state(self.env)
+
+        for i in range(max_steps_episodes):
+
+            state = utils.insert_axis0Tensor(state)
+
+            logits_a, critic_val = model(state)
+
+            action, prob_a = a3c.sample_action(logits_a)
+            state, reward, done, info = self.env.step(action)
+
+            state = tf.constant(state, dtype=tf.float32)
+
+            # Render screen every 10 steps
+            if i % 10 == 0:
+                screen = self.env.render(mode='rgb_array')
+                self.images.append(Image.fromarray(screen))
+
+            if done:
+                break
+
+
+    def save_image(self, image_file):
+        self.images[0].save(
+            image_file, save_all=True, append_images=self.images[1:], loop=0, duration=1)
+
+
+
+
+
 
 
 
