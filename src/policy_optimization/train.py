@@ -11,12 +11,13 @@ class trainer():
 
     def __init__(self, env, model, optimizer, a3c, par):
 
-        self.env = env
+        self.env = env()
         self.model = model
         self.optimizer = optimizer
         self.a3c = a3c
         self.par = par
         self.max_steps_episode = self.par.max_steps_episode
+        self.num_episodes = self.par.num_episodes
 
         self.writer = utils.create_writer()
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
@@ -42,7 +43,7 @@ class trainer():
 
         prob_action, critic_values, rewards = utils.initial_policyVar()
 
-        state = utils.initial_state(self.env)
+        state = tf.constant(self.env.reset(), dtype=tf.float32)
 
         for t in tf.range(self.max_steps_episode):
 
@@ -77,7 +78,7 @@ class trainer():
 
         return prob_action, critic_values, rewards
 
-    def train_episode(self, episode: int) -> tf.Tensor:
+    def run_episode(self, episode: int) -> tf.Tensor:
 
         with tf.GradientTape() as tape:
 
@@ -100,6 +101,29 @@ class trainer():
         self.score_metric.update_state(rewards)
 
         return episode_reward
+
+    def train(self):
+
+        running_reward = 0
+
+        with tqdm.trange(self.num_episodes) as episodes:
+            for episode in episodes:
+                episode_reward = int(self.run_episode(episode))
+
+                running_reward = episode_reward * 0.01 + running_reward * .99
+
+                episodes.set_description(f'Episode {episode}')
+                episodes.set_postfix(
+                    episode_reward=episode_reward, running_reward=running_reward)
+
+                # Show average episode reward every 10 episodes
+                if episode % 10 == 0:
+                    pass  # print(f'Episode {i}: average reward: {avg_reward}')
+
+                if running_reward > self.par.reward_threshold:
+                    break
+
+        print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
 
 
 

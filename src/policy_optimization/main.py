@@ -2,8 +2,10 @@ import gym
 import tqdm
 import tensorflow as tf
 from model import Networks
-from actor_critic import A3C
+from actor_critic import A3C, visualization
 from train import trainer
+import utils
+from utils import multiThread
 
 
 
@@ -19,6 +21,7 @@ class parameters:
         self.learning_rate = 0.01
         self.agent_history_length = 4
         self.reward_threshold = 195
+        self.num_process = 3
 
 if __name__ == "__main__":
 
@@ -27,31 +30,27 @@ if __name__ == "__main__":
     env = gym.make(par.env_name)
     num_action = env.action_space.n
     max_steps_episode = par.max_steps_episode
-    running_reward = 0
 
 
     #class import
     model = Networks(num_action, agent_history_length=4)
     optimizer = tf.keras.optimizers.Adam(learning_rate=par.learning_rate)
     a3c = A3C()
-    a3c_trainer = trainer(env, model, optimizer, a3c, par)
+    trainer = trainer(env, model, optimizer, a3c, par)
 
+    #set up threads
+    threads = utils.create_threads(trainer, par.num_process)
+    process = []
 
-    with tqdm.trange(par.num_episodes) as episodes:
-        for episode in episodes:
-            episode_reward = int(a3c_trainer.train_episode(episode))
+    for thread in threads:
+        thread.start()
+        process.append(thread)
 
-            running_reward = episode_reward * 0.01 + running_reward * .99
+    # Wait for all threads to complete
+    for t in process:
+        t.join()
 
-            episodes.set_description(f'Episode {episode}')
-            episodes.set_postfix(
-                episode_reward=episode_reward, running_reward=running_reward)
+    visual = visualization(env)
+    visual.create_images(model, a3c, par.max_steps_episode)
+    visual.save_image(image_file=f'{par.env_name}.gif')
 
-            # Show average episode reward every 10 episodes
-            if episode % 10 == 0:
-                pass  # print(f'Episode {i}: average reward: {avg_reward}')
-
-            if running_reward > par.reward_threshold:
-                break
-
-    print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')

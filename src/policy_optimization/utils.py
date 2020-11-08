@@ -1,8 +1,34 @@
 import tensorflow as tf
 import os
-from PIL import Image
-from pyvirtualdisplay import Display
+import threading
+from train import trainer
 
+'''Thread'''
+
+class multiThread(threading.Thread):
+
+    def __init__(self, trainer: 'trainer'):
+        super().__init__()
+
+        self.trainer = trainer
+        self.threadLock = threading.Lock()
+
+    def run(self):
+
+        self.threadLock.acquire()
+        self.trainer.train()
+        self.threadLock.release()
+
+def create_threads(target, num_process):
+
+    threads = []
+    for i in range(num_process):
+        thread = multiThread(target)
+        threads.append(thread)
+
+    return threads
+
+''''Variable Setting'''
 
 def initial_state(env):
 
@@ -27,6 +53,8 @@ def insert_axis1Tensor(*args):
 
     return [tf.expand_dims(x, 1) for x in args]
 
+'''File'''
+
 def create_writer(log_dir='logs/'):
 
     if not os.path.exists(log_dir):
@@ -43,6 +71,17 @@ def write_summary(writer, episode, score_metric, loss_metric):
         tf.summary.scalar("Episode", episode, step=episode)
         tf.summary.scalar("Loss", loss_metric.result(), step=episode)
         tf.summary.scalar("Average score", score_metric.result(), step=episode)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
