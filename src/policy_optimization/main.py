@@ -10,18 +10,20 @@ from utils import multiThread
 
 
 
-
 class parameters:
 
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
-        self.gamma = 0.99
         self.num_episodes = 10000
         self.max_steps_episode = 1000
+
         self.learning_rate = 0.01
         self.agent_history_length = 4
         self.reward_threshold = 195
         self.num_process = 3
+
+        self.gamma = 0.99 # discount factor for accumulating reward
+        self.betta = 0.01 # strength of the entropy
 
 if __name__ == "__main__":
 
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     model = Networks(num_action, agent_history_length=4)
     optimizer = tf.keras.optimizers.Adam(learning_rate=par.learning_rate)
     a3c = A3C()
-    trainer = trainer(env, model, optimizer, a3c, par)
+    trainer = trainer(env, model, optimizer, par)
 
     #set up threads
     threads = utils.create_threads(trainer, par.num_process)

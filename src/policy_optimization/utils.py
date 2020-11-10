@@ -2,31 +2,61 @@ import tensorflow as tf
 import os
 import threading
 from train import trainer
+import multiprocessing
 
 '''Thread'''
 
 class multiThread(threading.Thread):
 
-    def __init__(self, trainer: 'trainer'):
+    def __init__(self, env, model, optimizer, a3c, par):
         super().__init__()
 
-        self.trainer = trainer
+        self.env = env
+        self.model = model
+        self.optimizer = optimizer
+        self.a3c = a3c
+        self.par = par
+        self.trainer = trainer(self.env, self.model, self.optimizer, self.a3c, self.par)
         self.threadLock = threading.Lock()
 
     def run(self):
 
-        self.threadLock.acquire()
+        #self.threadLock.acquire()
         self.trainer.train()
-        self.threadLock.release()
+        #self.threadLock.release()
 
-def create_threads(target, num_process):
+def create_threads(env, model, optimizer, a3c, par):
 
     threads = []
-    for i in range(num_process):
-        thread = multiThread(target)
+    for i in range(par.num_process):
+        #thread = multiThread(env, model, optimizer, a3c, par)
+        thread = threading.Thread(target=train, args=(env, model, optimizer, a3c, par))
         threads.append(thread)
 
     return threads
+
+def creat_process(env, optimizer, par, trainer):
+
+    process = []
+
+    for i in range(multiprocessing.cpu_count()):
+        process.append(trainer(env, optimizer, par))
+        print(f"Attach {i}th class")
+
+    print(len(process))
+
+    start_process(process)
+
+def start_process(process):
+
+    for i, worker in enumerate(process):
+        print("Starting worker {}".format(i))
+        worker.start()
+
+
+
+
+
 
 ''''Variable Setting'''
 
@@ -41,13 +71,14 @@ def insert_axis0Tensor(state):
 
     return recent_state
 
-def initial_policyVar():
+def initial_tensorArray():
 
     prob_action = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     rewards = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+    entropy = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
-    return prob_action, values, rewards
+    return prob_action, values, rewards, entropy
 
 def insert_axis1Tensor(*args):
 

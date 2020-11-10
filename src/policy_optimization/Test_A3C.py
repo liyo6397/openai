@@ -11,7 +11,7 @@ class Test_par:
         self.env_name = "BreakoutNoFrameskip-v4"
         self.gamma = 0.6
         self.num_episodes = 2
-        self.max_steps_episode = 10000
+        self.max_steps_episode = 1000
         self.learning_rate = 0.01
         self.agent_history_length = 4
         self.reward_threshold = 195
@@ -119,7 +119,7 @@ class Test_train(unittest.TestCase):
         self.model = Networks(self.n_act, agent_history_length=4)
         self.a3c = A3C()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
-        self.trainer = trainer(lambda : gym.make(self.env_name), self.model, self.optimizer, self.a3c, self.par)
+        #self.trainer = trainer(lambda : gym.make(self.env_name), self.model, self.optimizer, self.par)
 
 
 
@@ -190,24 +190,45 @@ class Test_train(unittest.TestCase):
         #self.max_steps_episode = 1000
         self.trainer.train()
 
-    def test_thread(self):
+    def test_multithread(self):
 
-        threads = utils.create_threads(self.trainer, self.par.num_process)
+        threads = utils.create_threads(self.env, self.model, self.optimizer, self.a3c, self.par)
 
         process = []
-
-        count = 1
 
         for thread in threads:
             thread.start()
 
             process.append(thread)
-            count += 1
+
 
 
         # Wait for all threads to complete
         for t in process:
             t.join()
+
+    def test_threadINtrainer(self):
+
+
+        process = []
+        envs = []
+
+        for i in range(2):
+            a3c_trainer = trainer(self.env, self.model, self.optimizer, self.par)
+            a3c_trainer.start()
+            process.append(a3c_trainer)
+
+        for t in process:
+            t.join()
+
+    def test_create_thread(self):
+
+        #a3c_trainer = trainer(self.env, self.model, self.optimizer, self.par)
+
+        utils.creat_process(self.env, self.optimizer, self.par, trainer)
+
+
+
 
 
 
