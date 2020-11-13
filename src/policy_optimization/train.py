@@ -7,13 +7,15 @@ import threading
 from model import Networks
 
 
-class trainer(threading.Thread):
+#class trainer(threading.Thread):
+class trainer():
 
-    def __init__(self, env, optimizer, par):
-        super().__init__()
+    def __init__(self, env, optimizer, par, i, lock):
+        #super().__init__()
 
         self.env = env
         self.model = Networks(self.env.action_space.n, agent_history_length=4)
+
         self.optimizer = optimizer
         self.par = par
         self.max_steps_episode = self.par.max_steps_episode
@@ -22,10 +24,10 @@ class trainer(threading.Thread):
         self.writer = utils.create_writer()
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         self.score_metric = tf.keras.metrics.Mean('scores', dtype=tf.float32)
+        self.threadID = i
+        self.lock = lock
 
-    def run(self):
 
-        self._return = self.train()
 
 
     # Wrap OpenAI Gym's `env.step` call as an operation in a TensorFlow function.
@@ -48,9 +50,9 @@ class trainer(threading.Thread):
 
 
         #labels = [tf.one_hot(prob, depth=self.n_act)]
-        #entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob, logits=logits, axis=1)
+        entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob, logits=logits)
         #entropy = tf.reduce_sum(tf.one_hot(pi, depth=self.n_act) * tf.nn.log_softmax(logits), axis=1)
-        entropy = tf.reduce_sum(prob*tf.math.log(prob))
+        #entropy = tf.reduce_sum(prob*tf.math.log(prob))
 
         return entropy
 
@@ -105,16 +107,21 @@ class trainer(threading.Thread):
         return loss
 
 
-    def explore(self, episode: int) -> List[tf.Tensor]:
+    def explore(self, episode: int, initial_state: tf.Tensor) -> List[tf.Tensor]:
 
         prob_action, critic_values, rewards, entropies = utils.initial_tensorArray()
 
-        state = tf.constant(self.env.reset(), dtype=tf.float32)
+        #state = tf.constant(self.env.reset(), dtype=tf.float32)
+        initial_state_shape = initial_state.shape
+        state = initial_state
+
 
         for t in tf.range(self.max_steps_episode):
 
             #Add outer barch axis for state
-            state = utils.insert_axis0Tensor(state)
+            #state = utils.insert_axis0Tensor(state)
+            state = tf.expand_dims(state, 0)
+            state = tf.cast(state, tf.float32)
 
             # Run the model to get Q values for each action and critical values
             logits_a, critic_val = self.model(state)
@@ -124,8 +131,15 @@ class trainer(threading.Thread):
             entropy = self.produce_entropy(prob_a, logits_a)
 
             # Applying action to get next state and reward
-            next_state, reward, done = self.tf_env_step(action)
+            try:
+                next_state, reward, done = self.tf_env_step(action)
+            except:
+                print(f"Error occur at step {t} in eposide {episode}.")
+                print(f"Got the logits {logits_a}.")
+                print(f"Action: {action} Prob_a: {prob_a} ")
+
             state = next_state
+            #state.set_shape(initial_state_shape)
 
             # Collect the trainning data
             prob_action = prob_action.write(t, prob_a[0, action])
@@ -146,11 +160,11 @@ class trainer(threading.Thread):
 
         return prob_action, critic_values, rewards, entropies
 
-    def run_episode(self, episode: int) -> tf.Tensor:
+    def run_episode(self, episode: int, initial_state: tf.Tensor) -> tf.Tensor:
 
         with tf.GradientTape() as tape:
 
-            prob_a, c_values, rewards, entropies = self.explore(episode)
+            prob_a, c_values, rewards, entropies = self.explore(episode, initial_state)
 
             #Calculatr expected rewards for each time step
             exp_rewards = self.get_expected_rewards(rewards)
@@ -170,15 +184,14 @@ class trainer(threading.Thread):
 
         return episode_reward
 
-    def train(self):
+    def run(self):
 
         running_reward = 0
 
-
-
         with tqdm.trange(self.par.num_episodes) as episodes:
             for episode in episodes:
-                episode_reward = int(self.run_episode(episode))
+                initial_state = tf.constant(self.env.reset(), dtype=tf.float32)
+                episode_reward = int(self.run_episode(episode, initial_state))
 
                 running_reward = episode_reward * 0.01 + running_reward * .99
 
@@ -194,6 +207,9 @@ class trainer(threading.Thread):
                     break
 
         print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
+
+
+
 
 
 

@@ -5,17 +5,21 @@ import utils
 from actor_critic import A3C
 from model import Networks
 from train import trainer
+from threading import Thread, Lock
+from time import sleep
+import tqdm
 
 class Test_par:
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
         self.gamma = 0.6
-        self.num_episodes = 2
-        self.max_steps_episode = 1000
+        self.num_episodes = 10
+        self.max_steps_episode = 100
         self.learning_rate = 0.01
         self.agent_history_length = 4
         self.reward_threshold = 195
         self.num_process = 2
+        self.betta = 0.01
 
 
 
@@ -27,7 +31,9 @@ class Test_util(unittest.TestCase):
         self.agent_history_length = 4
         self.n_act = self.env.action_space.n
         self.net = Networks(self.n_act, self.agent_history_length)
-        self.a3c = A3C()
+        self.par = Test_par()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+        self.trainer = trainer(self.env, self.optimizer, self.par, i=0, lock=None)
 
     def test_inputsForCovN(self):
 
@@ -55,6 +61,8 @@ class Test_util(unittest.TestCase):
 
         logits_a, logits_c = self.net(recent_state)
 
+        print("State shape: ", state.shape)
+
 
 
         print("Actor: ",logits_a)
@@ -62,30 +70,35 @@ class Test_util(unittest.TestCase):
 
     def test_sample_action(self):
 
-        state = self.env.reset()
-        state = convert_batchTensor(state)
+        for i in range(3):
+            state = self.env.reset()
+            state = tf.constant(state, tf.float32)
 
-        logits_a, logits_c = self.net(state)
+            state = utils.insert_axis0Tensor(state)
 
-        a3c = A3C(self.par)
+            logits_a, logits_c = self.net(state)
 
 
-        action, prob, log_prob = a3c.sample_action(logits_a)
+            action, prob = self.trainer.sample_action(logits_a)
 
-        #print(logits_a)
+            next_state, reward, done = self.trainer.tf_env_step(action)
+
+        print(state.shape)
+
+        print(logits_a)
 
         print(action)
-        #print(prob)
-        print(log_prob)
+
 
     def test_entropy(self):
+        state = self.env.reset()
+        state = tf.constant(state, tf.float32)
 
-        ini_state = initial_state(self.env)
-        state = convert_batchTensor(ini_state)
+        state = utils.insert_axis0Tensor(state)
 
         logits_a, logits_c = self.net(state)
-        action, prob, log_prob = self.a3c.sample_action(logits_a)
-        entropy = self.a3c.produce_entropy(logits_a, prob)
+        action, prob = self.trainer.sample_action(logits_a)
+        entropy = self.trainer.produce_entropy(logits_a, prob)
 
 
         print(entropy)
@@ -119,18 +132,7 @@ class Test_train(unittest.TestCase):
         self.model = Networks(self.n_act, agent_history_length=4)
         self.a3c = A3C()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
-        #self.trainer = trainer(lambda : gym.make(self.env_name), self.model, self.optimizer, self.par)
-
-
-
-    def test_run_episode(self):
-
-        max_steps = 10
-        prob_a, critic_val, rewards = self.trainer.explore(1)
-
-        print("Probabilities: ", prob_a)
-        print("Critical values: ", critic_val)
-        print("Rewards: ", rewards)
+        self.trainer = trainer(self.env, self.optimizer, self.par, i=0, lock=None)
 
     def test_get_expected_reward(self):
 
@@ -170,25 +172,37 @@ class Test_train(unittest.TestCase):
     def test_compute_loss(self):
 
         max_steps = 1000
-        prob_a, critic_val, rewards = self.trainer.explore(1)
+        initial_state = tf.constant(self.env.reset(), dtype=tf.float32)
+        prob_a, critic_val, rewards = self.trainer.explore(1, initial_state)
 
         exp_rewards = self.a3c.get_expected_rewards(rewards, self.par.gamma)
 
-        loss = self.a3c.compute_loss(prob_a, critic_val, exp_rewards)
+        loss = self.trainer.compute_loss(prob_a, critic_val, exp_rewards)
 
         print(loss)
 
-    def test_train_episode(self):
+    def test_run_episode(self):
 
-        episode_reward = self.trainer.run_episode(1)
+        max_steps = 10
+        with tqdm.trange(5) as episodes:
 
-        print(episode_reward)
+            for i in episodes:
+                initial_state = tf.constant(self.env.reset(), dtype=tf.float32)
+
+
+                rewards = self.trainer.run_episode(i, initial_state)
+
+        
+        #print("Probabilities: ", prob_a)
+        #print("Critical values: ", critic_val)
+
+
 
     def test_main_training(self):
 
         #self.num_episodes = 1
         #self.max_steps_episode = 1000
-        self.trainer.train()
+        self.trainer.run()
 
     def test_multithread(self):
 
@@ -221,11 +235,27 @@ class Test_train(unittest.TestCase):
         for t in process:
             t.join()
 
-    def test_create_thread(self):
+    def test_threadTraining(self):
 
-        #a3c_trainer = trainer(self.env, self.model, self.optimizer, self.par)
+        process = []
+        num_process = 1
 
-        utils.creat_process(self.env, self.optimizer, self.par, trainer)
+        lock = Lock()
+
+        #lock.acquire()
+        for i in range(num_process):
+            process.append(trainer(self.env, self.optimizer, self.par, i, lock))
+
+
+        for i, worker in enumerate(process):
+            worker.start()
+
+
+        sleep(10)
+        #lock.release()
+        [w.join() for w in process]
+
+
 
 
 

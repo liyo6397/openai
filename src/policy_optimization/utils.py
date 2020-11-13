@@ -16,7 +16,7 @@ class multiThread(threading.Thread):
         self.optimizer = optimizer
         self.a3c = a3c
         self.par = par
-        self.trainer = trainer(self.env, self.model, self.optimizer, self.a3c, self.par)
+        self.trainer = trainer(self.env, self.model, self.optimizer, self.par)
         self.threadLock = threading.Lock()
 
     def run(self):
@@ -35,15 +35,13 @@ def create_threads(env, model, optimizer, a3c, par):
 
     return threads
 
-def creat_process(env, optimizer, par, trainer):
+def creat_process(env, optimizer, par, trainer, num_process):
 
     process = []
 
-    for i in range(multiprocessing.cpu_count()):
-        process.append(trainer(env, optimizer, par))
-        print(f"Attach {i}th class")
+    for i in range(num_process):
+        process.append(trainer(env, optimizer, par, i))
 
-    print(len(process))
 
     start_process(process)
 
@@ -52,6 +50,8 @@ def start_process(process):
     for i, worker in enumerate(process):
         print("Starting worker {}".format(i))
         worker.start()
+
+    [w.join() for w in process]
 
 
 

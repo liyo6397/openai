@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam, RMSprop
 
 class Networks(Model):
     def __init__(self, num_actions: int, agent_history_length: int):
-        super().__init__()
+        super(Networks, self).__init__()
 
         self.n_act = num_actions
         self.normalize = Lambda(lambda x: x / 255.0)
@@ -24,11 +24,12 @@ class Networks(Model):
         self.conv3 = Conv2D(filters=64, kernel_size=3, strides=1,
                             kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0), activation=None)
         self.flatten = Flatten()
-        self.dense1 = Dense(units=32, activation='relu', input_shape=(1,))
+        self.dense1 = Dense(units=512, activation='relu', input_shape=(1,))
         self.actor = Dense(units=self.n_act, activation=None)
         self.critic = Dense(units=1, activation=None)
 
-    def call(self, inputs)-> Tuple[tf.Tensor, tf.Tensor]:
+    @tf.function
+    def call(self, inputs: tf.Tensor)-> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         #h0 = self.normalize(inputs)
         h1 = self.conv1(inputs)
         h2 = self.conv2(h1)
