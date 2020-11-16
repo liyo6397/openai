@@ -4,17 +4,22 @@ from typing import Any, List, Sequence, Tuple
 import utils
 import tqdm
 import threading
+from threading import Lock
 from model import Networks
+import gym
+from time import sleep
 
 
-#class trainer(threading.Thread):
-class trainer():
+class trainer(threading.Thread):
+#class trainer():
 
-    def __init__(self, env, optimizer, par, i, lock):
-        #super().__init__()
+    def __init__(self, env, optimizer, par, global_model, i, lock):
+        super().__init__()
 
         self.env = env
-        self.model = Networks(self.env.action_space.n, agent_history_length=4)
+        self.global_model = global_model
+        self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
+        #self.local_model.set_weights(self.global_model.get_weights())
 
         self.optimizer = optimizer
         self.par = par
@@ -116,15 +121,16 @@ class trainer():
         state = initial_state
 
 
+
         for t in tf.range(self.max_steps_episode):
 
             #Add outer barch axis for state
             #state = utils.insert_axis0Tensor(state)
             state = tf.expand_dims(state, 0)
-            state = tf.cast(state, tf.float32)
+            #state = tf.cast(state, tf.float32)
 
             # Run the model to get Q values for each action and critical values
-            logits_a, critic_val = self.model(state)
+            logits_a, critic_val = self.local_model(state)
 
             # Sampling action from its probability distribution
             action, prob_a = self.sample_action(logits_a)
@@ -174,8 +180,10 @@ class trainer():
 
             loss = self.compute_loss(prob_a, c_values, exp_rewards, entropies)
 
-        grades = tape.gradient(loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(grades, self.model.trainable_variables))
+        grades = tape.gradient(loss, self.local_model.trainable_variables)
+        self.optimizer.apply_gradients(zip(grades, self.global_model.trainable_variables))
+
+        self.local_model.set_weights(self.global_model.get_weights())
 
         episode_reward = tf.math.reduce_sum(rewards)
 
@@ -185,17 +193,18 @@ class trainer():
         return episode_reward
 
     def run(self):
-
+        self.lock.acquire(timeout = 10)
         running_reward = 0
 
         with tqdm.trange(self.par.num_episodes) as episodes:
+
             for episode in episodes:
                 initial_state = tf.constant(self.env.reset(), dtype=tf.float32)
                 episode_reward = int(self.run_episode(episode, initial_state))
 
                 running_reward = episode_reward * 0.01 + running_reward * .99
 
-                episodes.set_description(f'Episode {episode}')
+                episodes.set_description(f'Episode {episode} thread {self.threadID}')
                 episodes.set_postfix(
                 episode_reward=episode_reward, running_reward=running_reward)
 
@@ -206,15 +215,49 @@ class trainer():
                 if running_reward > self.par.reward_threshold:
                     break
 
+        #self.lock.release()
+
         print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
 
+class Worker:
+
+    def __init__(self, num_process, game_name, par):
+
+        self.num_process = num_process
+        self.env = gym.make(game_name)
+        self.par = par
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+        self.global_model = Networks(self.env.action_space.n, agent_history_length=4)
+        inputs_shape = utils.nn_input_shape(game_name, atari = True)
+        inputs = tf.random.normal(inputs_shape)
+        self.global_model(inputs)
+
+    def train(self):
+
+        # Set seed for experiment reproducibility
+        seed = 42
+        self.env.seed(seed)
+        tf.random.set_seed(seed)
+        np.random.seed(seed)
 
 
 
+        process = []
+        lock = Lock()
 
 
 
+        lock.acquire()
 
+        for i in range(self.num_process):
+            process.append(trainer(self.env, self.optimizer, self.par, self.global_model, i, lock))
+
+
+        for i, worker in enumerate(process):
+            worker.start()
+        sleep(10)
+        #lock.release()
+        [w.join() for w in process]
 
 
 

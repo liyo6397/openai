@@ -3,59 +3,7 @@ import os
 import threading
 from train import trainer
 import multiprocessing
-
-'''Thread'''
-
-class multiThread(threading.Thread):
-
-    def __init__(self, env, model, optimizer, a3c, par):
-        super().__init__()
-
-        self.env = env
-        self.model = model
-        self.optimizer = optimizer
-        self.a3c = a3c
-        self.par = par
-        self.trainer = trainer(self.env, self.model, self.optimizer, self.par)
-        self.threadLock = threading.Lock()
-
-    def run(self):
-
-        #self.threadLock.acquire()
-        self.trainer.train()
-        #self.threadLock.release()
-
-def create_threads(env, model, optimizer, a3c, par):
-
-    threads = []
-    for i in range(par.num_process):
-        #thread = multiThread(env, model, optimizer, a3c, par)
-        thread = threading.Thread(target=train, args=(env, model, optimizer, a3c, par))
-        threads.append(thread)
-
-    return threads
-
-def creat_process(env, optimizer, par, trainer, num_process):
-
-    process = []
-
-    for i in range(num_process):
-        process.append(trainer(env, optimizer, par, i))
-
-
-    start_process(process)
-
-def start_process(process):
-
-    for i, worker in enumerate(process):
-        print("Starting worker {}".format(i))
-        worker.start()
-
-    [w.join() for w in process]
-
-
-
-
+import gym
 
 
 ''''Variable Setting'''
@@ -83,6 +31,17 @@ def initial_tensorArray():
 def insert_axis1Tensor(*args):
 
     return [tf.expand_dims(x, 1) for x in args]
+
+def nn_input_shape(env_game, atari=False):
+
+    env = gym.make(env_game)
+    state = env.reset()
+    state = tf.constant(state, tf.float32)
+
+    if atari:
+        state = insert_axis0Tensor(state)
+
+    return state.shape
 
 '''File'''
 
