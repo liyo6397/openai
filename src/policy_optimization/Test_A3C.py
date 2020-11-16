@@ -4,16 +4,17 @@ import tensorflow as tf
 import utils
 from actor_critic import A3C
 from model import Networks
-from train import trainer
+from train import trainer, Worker
 from threading import Thread, Lock
 from time import sleep
 import tqdm
+import numpy as np
 
 class Test_par:
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
         self.gamma = 0.6
-        self.num_episodes = 10
+        self.num_episodes = 5
         self.max_steps_episode = 100
         self.learning_rate = 0.01
         self.agent_history_length = 4
@@ -132,7 +133,7 @@ class Test_train(unittest.TestCase):
         self.model = Networks(self.n_act, agent_history_length=4)
         self.a3c = A3C()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
-        self.trainer = trainer(self.env, self.optimizer, self.par, i=0, lock=None)
+        self.trainer = trainer(self.env, self.optimizer, self.par, self.model, i=0, lock=None)
 
     def test_get_expected_reward(self):
 
@@ -192,7 +193,7 @@ class Test_train(unittest.TestCase):
 
                 rewards = self.trainer.run_episode(i, initial_state)
 
-        
+
         #print("Probabilities: ", prob_a)
         #print("Critical values: ", critic_val)
 
@@ -238,22 +239,27 @@ class Test_train(unittest.TestCase):
     def test_threadTraining(self):
 
         process = []
-        num_process = 1
+        num_process = 2
 
-        lock = Lock()
+        worker = Worker(num_process, self.par.env_name, self.par)
+        worker.train()
 
-        #lock.acquire()
-        for i in range(num_process):
-            process.append(trainer(self.env, self.optimizer, self.par, i, lock))
+    def test_globalModel(self):
+
+        state = self.env.reset()
+        state = tf.constant(state, tf.float32)
+
+        state = utils.insert_axis0Tensor(state)
+        model = self.model
 
 
-        for i, worker in enumerate(process):
-            worker.start()
+
+        inputs = tf.random.normal(state.shape)
+        print(inputs)
+        model(inputs)
 
 
-        sleep(10)
-        #lock.release()
-        [w.join() for w in process]
+
 
 
 
