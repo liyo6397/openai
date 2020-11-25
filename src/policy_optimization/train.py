@@ -193,7 +193,7 @@ class trainer(threading.Thread):
         return episode_reward
 
     def run(self):
-        self.lock.acquire(timeout = 10)
+        self.lock.acquire()
         running_reward = 0
 
         with tqdm.trange(self.par.num_episodes) as episodes:
@@ -215,16 +215,17 @@ class trainer(threading.Thread):
                 if running_reward > self.par.reward_threshold:
                     break
 
-        #self.lock.release()
+        self.lock.release()
 
         print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
 
-class Worker:
+class Worker():
 
     def __init__(self, num_process, game_name, par):
 
         self.num_process = num_process
         self.env = gym.make(game_name)
+        self.game_name = game_name
         self.par = par
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
         self.global_model = Networks(self.env.action_space.n, agent_history_length=4)
@@ -232,13 +233,13 @@ class Worker:
         inputs = tf.random.normal(inputs_shape)
         self.global_model(inputs)
 
-    def train(self):
+    def set_seed(self, env, seed):
 
-        # Set seed for experiment reproducibility
-        seed = 42
         self.env.seed(seed)
         tf.random.set_seed(seed)
         np.random.seed(seed)
+
+    def train(self):
 
 
 
@@ -246,17 +247,16 @@ class Worker:
         lock = Lock()
 
 
-
-        lock.acquire()
-
         for i in range(self.num_process):
-            process.append(trainer(self.env, self.optimizer, self.par, self.global_model, i, lock))
+            env = gym.make(self.game_name)
+            # Set seed for experiment reproducibility
+            self.set_seed(env, seed=42)
+            process.append(trainer(env, self.optimizer, self.par, self.global_model, i, lock))
 
 
         for i, worker in enumerate(process):
             worker.start()
-        sleep(10)
-        #lock.release()
+
         [w.join() for w in process]
 
 
