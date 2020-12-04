@@ -4,18 +4,18 @@ import tensorflow as tf
 import utils
 from actor_critic import A3C
 from model import Networks
-from train import trainer, Worker
+from train import trainer, Runner, A3C
 from threading import Thread, Lock
 from time import sleep
 import tqdm
 import numpy as np
-
+import queue
 class Test_par:
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
         self.gamma = 0.6
         self.num_episodes = 5
-        self.max_steps_episode = 100
+        self.max_steps_episode = 5
         self.learning_rate = 0.01
         self.agent_history_length = 4
         self.reward_threshold = 195
@@ -131,9 +131,9 @@ class Test_train(unittest.TestCase):
         self.par = Test_par()
         self.n_act = self.env.action_space.n
         self.model = Networks(self.n_act, agent_history_length=4)
-        self.a3c = A3C()
+        self.a3c = A3C(self.par.env_name, self.par)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
-        self.trainer = trainer(self.env, self.optimizer, self.par, self.model, i=0, lock=None)
+        self.trainer = trainer(self.env, self.par)
 
     def test_get_expected_reward(self):
 
@@ -257,6 +257,146 @@ class Test_train(unittest.TestCase):
         inputs = tf.random.normal(state.shape)
         print(inputs)
         model(inputs)
+
+    def runner(self):
+
+        #mem = utils.Memory()
+
+       # with tqdm.trange(2) as episodes:
+        episode = 0
+        while True:
+            mem = self.trainer.explore(episode, self.model)
+            episode += 1
+            yield mem
+
+
+    def test_explore_queue(self):
+
+        que = queue.Queue()
+
+        mem = self.runner()
+
+
+        for i in range(5):
+            rec = next(mem)
+            que.put(rec, timeout=100.0)
+            #print("action:", rec.action)
+
+        while not que.empty():
+            mem = que.get()
+            print(mem.prob_action)
+
+    def get_queue(self, que):
+
+
+
+        mem = que.get()
+        while not que.empty():
+            mem.concat(que.get())
+
+
+
+
+        print("After concat: ",mem.prob_action)
+
+
+    def test_get_queue(self):
+
+        que = queue.Queue()
+
+        mem = self.runner()
+
+
+        for i in range(3):
+            #que.put(var)
+            #print("Put ", var)
+            rec = next(mem)
+            que.put(rec, timeout=100.0)
+            print("Prob action:", rec.prob_action)
+
+        self.get_queue(que)
+
+    def test_runner(self):
+
+        global_model = self.trainer.global_model
+        worker = Runner(self.env, self.par, global_model)
+
+        worker.run()
+
+        que = worker.queue
+
+        while not que.empty():
+            mem = que.get()
+            print(mem.prob_action)
+
+class Test_A3Cclass(unittest.TestCase):
+
+    def setUp(self):
+
+        self.par = Test_par()
+        self.env = gym.make(self.par.env_name)
+        self.A3C = A3C(self.par.env_name, self.par)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+
+    def test_runner(self):
+
+        mem = self.A3C.get_queue()
+
+        print(mem.prob_action)
+
+    def test_expected_rewards(self):
+
+        worker = Runner(self.env, self.par, self.A3C.global_model)
+        worker.run()
+        que = worker.queue
+        mem = self.A3C.get_queue(que)
+
+        a3c_trainer = trainer(self.env, self.optimizer, self.par, self.A3C.global_model)
+        exp_rewards = a3c_trainer.get_expected_rewards(mem.rewards)
+
+        print(exp_rewards)
+
+    def test_loss(self):
+        a3c_trainer = trainer(self.env, self.par)
+        worker = Runner(self.env, self.par, self.A3C.global_model, a3c_trainer)
+        worker.run()
+        que = worker.queue
+        mem = self.A3C.get_queue()
+
+
+        exp_rewards = a3c_trainer.get_expected_rewards(mem.rewards)
+
+        prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(mem.prob_action, mem.critic_values,
+                                                                            exp_rewards,
+                                                                            mem.entropies)
+
+        loss = a3c_trainer.compute_loss(prob_a, c_values, exp_rewards, entropies)
+
+        print(loss)
+
+    def test_grad_descent(self):
+
+
+
+        episode_reward = self.A3C.grad_descent()
+
+        print(episode_reward)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
