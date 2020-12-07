@@ -329,6 +329,8 @@ class Test_train(unittest.TestCase):
             mem = que.get()
             print(mem.prob_action)
 
+
+
 class Test_A3Cclass(unittest.TestCase):
 
     def setUp(self):
@@ -381,6 +383,101 @@ class Test_A3Cclass(unittest.TestCase):
         episode_reward = self.A3C.grad_descent()
 
         print(episode_reward)
+
+    def runner(self, que):
+
+        self.que = que
+        i = 0
+        for i in range(5):
+        #while True:
+            print("Put :", i)
+            self.que.put(i)
+            self.que.task_done()
+
+
+
+
+
+        #return que
+
+    def process_que(self):
+
+        while True:
+
+            if not self.que.empty() :
+                item = self.que.get()
+                print("Get: ", item)
+            else:
+                break
+
+        return self.que
+
+
+    def test_thread(self):
+        #Parameters
+        num_process = 2
+        threads = []
+        self.que = queue.Queue()
+
+
+        # Set thread
+        for i in range(num_process):
+            #start from put
+            t = Thread(target=self.runner, args=(self.que,))
+            #start from get
+            #t = Thread(target=self.process_que)
+            t.start()
+            threads.append(t)
+
+
+
+        # start putting elements into queue
+        #self.runner(self.que)
+        self.que = self.process_que()
+
+
+        print('stopping workers!')
+
+        self.que.join()
+
+        for t in threads:
+            t.join()
+
+    def test_RunnerThread(self):
+
+        # Set up Parameters
+        num_process = 2
+        threads = []
+
+        #Set up Class
+        a3c_trainer = trainer(self.env, self.par)
+
+        #Start thread
+
+        runner = Runner(self.env, self.par, self.A3C.local_model, a3c_trainer)
+            #start from get
+        runner.start_runner()
+            #t = Thread(target=self.process_que)
+
+        threads.append(runner)
+
+        for t in threads:
+            t.join()
+
+
+        que_data = self.A3C.get_queue(runner.queue)
+
+        print("Entropies: ", que_data.entropies)
+
+
+
+
+
+
+
+
+
+
 
 
 

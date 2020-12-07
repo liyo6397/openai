@@ -4,7 +4,7 @@ from typing import Any, List, Sequence, Tuple
 import utils
 import tqdm
 import threading
-from threading import Lock
+from threading import Lock, Thread
 from model import Networks
 import gym
 from time import sleep
@@ -234,7 +234,7 @@ def env_runner(num_episodes, env, optimizer, par, global_model):
 
         print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
 
-class Runner():
+class Runner(Thread):
 
     def __init__(self, env, par, model, trainer):
         super().__init__()
@@ -269,7 +269,9 @@ class Runner():
 
         mem = self.collect_data()
         for i in range(self.max_steps_episode):
-            self.queue.put(next(mem), timeout=600.0)
+        #while True:
+            self.queue.put(next(mem), timeout=10.0)
+            self.queue.task_done()
 
     def train(self):
 
@@ -321,10 +323,10 @@ class A3C:
         tf.random.set_seed(seed)
         np.random.seed(seed)
 
-    def get_queue(self):
+    def get_queue(self, que):
 
-        self.runner.run()
-        que = self.runner.queue
+        #self.runner.run()
+        #que = self.runner.queue
         que_data = que.get()
         while not que.empty():
 
@@ -353,6 +355,7 @@ class A3C:
         self.local_model.set_weights(self.global_model.get_weights())
 
         episode_reward = tf.math.reduce_sum(que_data.rewards)
+
 
 
         return episode_reward
