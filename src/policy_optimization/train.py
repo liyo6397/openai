@@ -252,7 +252,8 @@ class Runner(Thread):
         self.trainer = trainer
 
 
-    def start_runner(self):
+    def start_runner(self, threadID):
+        print("Thread: ", threadID)
         self.start()
 
     def collect_data(self):
@@ -308,7 +309,8 @@ class A3C:
         inputs = tf.random.normal(inputs_shape)
         self.global_model(inputs)
         self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
-        #self.local_model(inputs)
+        self.local_model(inputs)
+
 
 
         self.trainer = trainer(self.env, self.par)
@@ -323,10 +325,13 @@ class A3C:
         tf.random.set_seed(seed)
         np.random.seed(seed)
 
-    def get_queue(self, que):
+    def start(self, threadID):
+        self.runner.start_runner(threadID)
+
+    def get_queue(self):
 
         #self.runner.run()
-        #que = self.runner.queue
+        que = self.runner.queue
         que_data = que.get()
         while not que.empty():
 
@@ -339,8 +344,10 @@ class A3C:
         with tf.GradientTape() as tape:
             # Collect data from runner
             que_data = self.get_queue()
+
             # Calculatr expected rewards for each time step
             exp_rewards = self.trainer.get_expected_rewards(que_data.rewards)
+
 
             # Convert training data to appropriate TF tensor shapes
             prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(que_data.prob_action,
@@ -349,8 +356,9 @@ class A3C:
                                                                                 que_data.entropies)
 
             loss = self.trainer.compute_loss(prob_a, c_values, exp_rewards, entropies)
-
+            print("loss: ", loss)
         grades = tape.gradient(loss, self.local_model.trainable_variables)
+        print("grades: ",grades)
         self.optimizer.apply_gradients(zip(grades, self.global_model.trainable_variables))
         self.local_model.set_weights(self.global_model.get_weights())
 

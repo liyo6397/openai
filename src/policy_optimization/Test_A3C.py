@@ -453,13 +453,13 @@ class Test_A3Cclass(unittest.TestCase):
         a3c_trainer = trainer(self.env, self.par)
 
         #Start thread
-
-        runner = Runner(self.env, self.par, self.A3C.local_model, a3c_trainer)
+        for i in range(2):
+            runner = Runner(self.env, self.par, self.A3C.local_model, a3c_trainer)
             #start from get
-        runner.start_runner()
+            runner.start_runner(i)
             #t = Thread(target=self.process_que)
 
-        threads.append(runner)
+            threads.append(runner)
 
         for t in threads:
             t.join()
@@ -468,6 +468,32 @@ class Test_A3Cclass(unittest.TestCase):
         que_data = self.A3C.get_queue(runner.queue)
 
         print("Entropies: ", que_data.entropies)
+
+    def test_A3C_runnerQueue(self):
+
+        threads = []
+
+        for i in range(2):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=0)
+        que_data = a3c.get_queue()
+        print("Critical Values: ",que_data.critic_values)
+        a3c.runner.join()
+
+    def test_A3C_gradient(self):
+
+        threads = []
+
+        for i in range(2):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=i)
+
+        a3c.grad_descent()
+        #print("Critical Values: ",que_data.critic_values)
+        a3c.runner.join()
+
+
+
 
 
 
