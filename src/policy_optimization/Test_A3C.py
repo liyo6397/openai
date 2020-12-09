@@ -488,9 +488,22 @@ class Test_A3Cclass(unittest.TestCase):
             a3c = A3C(self.par.env_name, self.par)
             a3c.start(threadID=i)
 
-        a3c.grad_descent()
-        #print("Critical Values: ",que_data.critic_values)
+        grades, exp_reward = a3c.grad_descent()
+        print("Grades: ",grades)
         a3c.runner.join()
+
+    def test_setup_localModel(self):
+
+        model = self.A3C.local_model
+        a3c_trainer = trainer(self.env, self.par)
+
+        memory = a3c_trainer.explore(0, model)
+        #print("states: ", memory.states)
+        #print("inputs for global model: ", self.A3C.inputs)
+        logits_a, prob_a, c_val = self.A3C.setup_localmodel(memory.states)
+        print("logits: ", logits_a)
+        print("Probability of a: ", prob_a)
+        print("Critical values: ", c_val)
 
 
 

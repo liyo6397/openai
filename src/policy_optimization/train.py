@@ -28,7 +28,6 @@ class trainer:
         self.writer = utils.Writer()
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         self.score_metric = tf.keras.metrics.Mean('scores', dtype=tf.float32)
-        self.threadID = i
         self.lock = lock
 
 
@@ -134,7 +133,7 @@ class trainer:
 
             state = next_state
 
-            mem.experiance(action, reward, entropy)
+            mem.experiance(state, action, reward, entropy)
             # Collect the trainning data
 
             mem.training_data(t, prob_a, critic_val, done)
@@ -166,6 +165,7 @@ class trainer:
                                                                                 que_data.entropies)
 
             loss = self.compute_loss(prob_a, c_values, exp_rewards, entropies)
+
 
         grades = tape.gradient(loss, self.local_model.trainable_variables)
         self.optimizer.apply_gradients(zip(grades, self.global_model.trainable_variables))
@@ -306,10 +306,11 @@ class A3C:
         #set up global model
         self.global_model = Networks(self.env.action_space.n, agent_history_length=4)
         inputs_shape = utils.nn_input_shape(game_name, atari=True)
-        inputs = tf.random.normal(inputs_shape)
-        self.global_model(inputs)
+        self.inputs = tf.random.normal(inputs_shape)
+        self.global_model(self.inputs)
+
+        #set up local model
         self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
-        self.local_model(inputs)
 
 
 
@@ -319,6 +320,36 @@ class A3C:
         # For recording results
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         self.score_metric = tf.keras.metrics.Mean('scores', dtype=tf.float32)
+
+    def setup_localmodel(self, inputs):
+        # Run the model to get Q values for each action and critical values
+        logits_a, critic_val = self.local_model(inputs)
+
+        # Sampling action from its probability distribution
+        action, prob_a = self.trainer.sample_action(logits_a)
+        entropy = self.trainer.produce_entropy(prob_a, logits_a)
+
+        #prob_a = prob_a[0, action]
+        c_val = tf.squeeze(critic_val)
+
+        return logits_a, prob_a, c_val
+
+    def compute_loss(self,
+                     action_probs: tf.Tensor,
+                     critic_values: tf.Tensor,
+                     exp_rewards: tf.Tensor,
+                     entropies: tf.Tensor) -> tf.Tensor:
+
+        advantage = exp_rewards - critic_values
+        log_prob = tf.math.log(action_probs)
+
+        actor_loss = -tf.math.reduce_sum(log_prob * advantage)
+        critic_loss = self.trainer.huber_loss(exp_rewards, critic_values) - self.par.betta * entropies
+
+        loss = actor_loss + critic_loss
+
+        return loss
+
 
     def set_seed(self, env, seed=42):
         env.seed(seed)
@@ -356,17 +387,19 @@ class A3C:
                                                                                 que_data.entropies)
 
             loss = self.trainer.compute_loss(prob_a, c_values, exp_rewards, entropies)
-            print("loss: ", loss)
-        grades = tape.gradient(loss, self.local_model.trainable_variables)
-        print("grades: ",grades)
-        self.optimizer.apply_gradients(zip(grades, self.global_model.trainable_variables))
-        self.local_model.set_weights(self.global_model.get_weights())
 
+        grads = tape.gradient(loss, self.local_model.trainable_variables)
         episode_reward = tf.math.reduce_sum(que_data.rewards)
 
 
 
-        return episode_reward
+        return grads, episode_reward
+
+    def sync_weights(self, grads):
+        # Sync local model weights with global model
+        self.optimizer.apply_gradients(zip(grads, self.global_model.trainable_variables))
+        self.local_model.set_weights(self.global_model.get_weights())
+
 
 
 

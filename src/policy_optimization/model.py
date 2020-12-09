@@ -29,7 +29,7 @@ class Networks(Model):
         self.critic = Dense(units=1, activation=None)
 
     @tf.function
-    def call(self, inputs: tf.Tensor)-> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def call(self, inputs: tf.Tensor)-> Tuple[tf.Tensor, tf.Tensor]:
         #h0 = self.normalize(inputs)
         h1 = self.conv1(inputs)
         h2 = self.conv2(h1)

@@ -88,13 +88,20 @@ class Memory():
         self.rewards = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
         self.entropies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         self.terminal = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+        self.states = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.actions = []
 
 
-    def experiance(self, action, reward, entropy):
+    def experiance(self, state, action, reward, entropy):
 
         self.action = action
         self.reward = reward
         self.entropy = entropy
+        self.state = state
+
+        self.actions += [action]
+
+
 
     def training_data(self, t, prob_a, critic_val, done):
         self.prob_action = self.prob_action.write(t, prob_a[0, self.action])
@@ -102,6 +109,7 @@ class Memory():
         self.rewards = self.rewards.write(t, self.reward)
         self.entropies = self.entropies.write(t, self.entropy)
         self.terminal = self.terminal.write(t, done)
+        self.states = self.states.write(t, self.state)
 
     def to_stack(self):
 
@@ -110,6 +118,7 @@ class Memory():
         self.rewards = self.rewards.stack()
         self.entropies = self.entropies.stack()
         self.terminal = self.terminal.stack()
+        self.states = self.states.stack()
 
     def concat(self, other):
 
@@ -118,6 +127,9 @@ class Memory():
         self.rewards = tf.concat([self.rewards, other.rewards], 0)
         self.entropies = tf.concat([self.entropies, other.entropies], 0)
         self.terminal = tf.concat([self.terminal, other.terminal], 0)
+
+        self.actions.extend(other.actions)
+        self.states.extend(other.states)
 
 
 
