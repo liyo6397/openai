@@ -500,10 +500,24 @@ class Test_A3Cclass(unittest.TestCase):
         memory = a3c_trainer.explore(0, model)
         #print("states: ", memory.states)
         #print("inputs for global model: ", self.A3C.inputs)
-        logits_a, prob_a, c_val = self.A3C.setup_localmodel(memory.states)
+        logits_a, prob_a, action, c_val , entropies= self.A3C.setup_localmodel(memory.states)
         print("logits: ", logits_a)
         print("Probability of a: ", prob_a)
+        print("Action: ", action)
         print("Critical values: ", c_val)
+        print("Entropies: ", entropies)
+
+    def test_localmodel_loss(self):
+
+        model = self.A3C.local_model
+        a3c_trainer = trainer(self.env, self.par)
+
+        memory = a3c_trainer.explore(0, model)
+
+        logits_a, prob_a, action, c_val, entropies = self.A3C.setup_localmodel(memory.states)
+        loss = self.A3C.compute_loss(prob_a, c_val, self.A3C.exp_rewards, entropies, action)
+
+        print("Loss: ", loss)
 
 
 

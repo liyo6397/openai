@@ -33,6 +33,11 @@ def insert_axis1Tensor(*args):
 
     return [tf.expand_dims(x, 1) for x in args]
 
+def to_stack(*args):
+
+    return [x.stack() for x in args]
+
+
 def nn_input_shape(env_game, atari=False):
 
     env = gym.make(env_game)

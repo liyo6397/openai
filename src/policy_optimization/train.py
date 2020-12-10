@@ -60,7 +60,7 @@ class trainer:
 
     def sample_action(self, logits):
 
-        action = tf.random.categorical(logits, 1)[0, 0]
+        action = tf.random.categorical(logits, 1)[0,0]
         prob = tf.nn.softmax(logits)
 
 
@@ -310,35 +310,69 @@ class A3C:
         self.global_model(self.inputs)
 
         #set up local model
-        self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
-
-
-
         self.trainer = trainer(self.env, self.par)
+        self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
+        #self.logits_a, self.prob_a, self.action, self.critic_val, self.entropies = self.setup_localmodel(self.inputs)
+
+        #setup tensors for training data
+        self.prob_action = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.critic_values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.rewards = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+        self.entropies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.terminal = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+        self.states = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+
+
+        #Calculate loss
+        self.exp_rewards = tf.zeros_like(self.critic_val)
+        #self.loss = self.compute_loss(self.prob_a, self.critic_val, self.exp_rewards, self.entropies)
+
+
+        #set up workers
         self.runner = Runner(self.env, par, self.local_model, self.trainer)
 
         # For recording results
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         self.score_metric = tf.keras.metrics.Mean('scores', dtype=tf.float32)
 
-    def setup_localmodel(self, inputs):
-        # Run the model to get Q values for each action and critical values
-        logits_a, critic_val = self.local_model(inputs)
+    def sample_action(self, logits):
 
-        # Sampling action from its probability distribution
-        action, prob_a = self.trainer.sample_action(logits_a)
-        entropy = self.trainer.produce_entropy(prob_a, logits_a)
+        action = tf.random.categorical(logits, 1)[0,0]
+        prob = tf.nn.softmax(logits)
 
-        #prob_a = prob_a[0, action]
-        c_val = tf.squeeze(critic_val)
 
-        return logits_a, prob_a, c_val
+        return action, prob
 
-    def compute_loss(self,
-                     action_probs: tf.Tensor,
-                     critic_values: tf.Tensor,
-                     exp_rewards: tf.Tensor,
-                     entropies: tf.Tensor) -> tf.Tensor:
+    def setup_localmodel(self, states, rewards):
+
+
+        for i, state in enumerate(states):
+            # Run the model to get Q values for each action and critical values
+            logits_a, critic_val = self.local_model(state)
+            # Sampling action from its probability distribution
+            action, prob_a = self.sample_action(logits_a)
+            entropy = self.trainer.produce_entropy(prob_a, logits_a)
+            c_val = tf.squeeze(critic_val)
+
+            self.prob_action = self.prob_action.write(i, prob_a[0, action])
+            self.critic_values = self.critic_values.write(i, tf.squeeze(critic_val))
+            self.entropies = self.entropies.write(i, entropy)
+            self.rewards = self.rewards.write(i, rewards[i])
+
+        self.prob_action, self.critic_values, self.entropies, self.rewards \
+            = utils.to_stack(self.prob_action, self.critic_values, self.entropies, self.rewards)
+
+
+        #return logits_a, prob_a, action, c_val, entropy
+
+    def compute_loss(self):
+
+
+        # Convert training data to appropriate TF tensor shapes
+        prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(prob_a,
+                                                                            critic_values,
+                                                                            exp_rewards,
+                                                                            entropies)
 
         advantage = exp_rewards - critic_values
         log_prob = tf.math.log(action_probs)
