@@ -4,7 +4,7 @@ import tensorflow as tf
 import utils
 from actor_critic import A3C
 from model import Networks
-from train import trainer, Runner, A3C
+from train import trainer, Runner, A3C, policy_runner
 from threading import Thread, Lock
 from time import sleep
 import tqdm
@@ -497,15 +497,36 @@ class Test_A3Cclass(unittest.TestCase):
         model = self.A3C.local_model
         a3c_trainer = trainer(self.env, self.par)
 
-        memory = a3c_trainer.explore(0, model)
-        #print("states: ", memory.states)
+        memory = policy_runner(self.env, model)
+        print("states: ", np.array(memory.states).shape)
         #print("inputs for global model: ", self.A3C.inputs)
-        logits_a, prob_a, action, c_val , entropies= self.A3C.setup_localmodel(memory.states)
-        print("logits: ", logits_a)
+        #logits_a, prob_a, action, c_val , entropies= self.A3C.setup_localmodel(memory.states)
+        '''print("logits: ", logits_a)
+        print("Probability of a: ", prob_a)
+        print("Action: ", action)
+        print("Critical values: ", c_val)
+        print("Entropies: ", entropies)'''
+
+    def test_localmodel_expectedRewards(self):
+
+        model = self.A3C.local_model
+        a3c_trainer = trainer(self.env, self.par)
+
+        memory = a3c_trainer.explore(0, model)
+        print("states: ", memory.states.shape)
+        logits_a, prob_a, action, c_val, entropies = self.A3C.setup_localmodel(memory.states)
+        exp_rewards = self.A3C.get_expected_rewards(memory.rewards)
+        print("Expected Rewards: ", exp_rewards)
+
         print("Probability of a: ", prob_a)
         print("Action: ", action)
         print("Critical values: ", c_val)
         print("Entropies: ", entropies)
+
+
+        #loss = self.A3C.compute_loss(prob_a, c_val, exp_rewards, entropies, action)
+
+        #print("Loss: ", loss)
 
     def test_localmodel_loss(self):
 
@@ -515,9 +536,14 @@ class Test_A3Cclass(unittest.TestCase):
         memory = a3c_trainer.explore(0, model)
 
         logits_a, prob_a, action, c_val, entropies = self.A3C.setup_localmodel(memory.states)
-        loss = self.A3C.compute_loss(prob_a, c_val, self.A3C.exp_rewards, entropies, action)
+        exp_rewards = self.A3C.get_expected_rewards(memory.rewards)
+
+
+        loss = self.A3C.compute_loss(prob_a, c_val, exp_rewards, entropies)
 
         print("Loss: ", loss)
+
+
 
 
 

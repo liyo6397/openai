@@ -84,6 +84,29 @@ class Writer:
         self.loss_metric.reset_states()
         self.score_metric.reset_states()
 
+class Pipeline:
+    def __init__(self):
+
+        self.states = []
+        self.actions = []
+        self.rewards = []
+        self.done = False
+
+    def store(self, state, action, reward, done):
+
+        self.states += [state]
+        self.actions += [action]
+        self.rewards += [reward]
+        self.done = done
+
+    def extend(self, other):
+        assert not self.done
+        self.states.extend(other.states)
+        self.actions.extend(other.actions)
+        self.rewards.extend(other.rewards)
+        self.terminal = other.terminal
+
+
 class Memory():
 
     def __init__(self):
@@ -101,9 +124,8 @@ class Memory():
 
         self.action = action
         self.reward = reward
-        self.entropy = entropy
         self.state = state
-
+        self.entropy = entropy
         self.actions += [action]
 
 
