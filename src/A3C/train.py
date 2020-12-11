@@ -112,6 +112,7 @@ class trainer:
 
         state = tf.constant(self.env.reset(), dtype=tf.float32)
 
+
         mem = utils.Memory()
 
         for t in tf.range(self.max_steps_episode):
@@ -201,39 +202,52 @@ class trainer:
 
         return episode_reward
 
-def env_runner(num_episodes, env, optimizer, par, global_model):
-        #self.lock.acquire()
-    running_reward = 0
-
-
-    with tqdm.trange(num_episodes) as episodes:
-
-        for episode in episodes:
-            trainer = A3Ctrainer(env, optimizer, par, global_model)
-            initial_state = tf.constant(env.reset(), dtype=tf.float32)
-            episode_reward, memory = int(trainer.run_episode(episode, initial_state))
-
-            running_reward = episode_reward * 0.01 + running_reward * .99
-
-            episodes.set_description(f'Episode {episode}')
-            episodes.set_postfix(
-            episode_reward=episode_reward, running_reward=running_reward)
-
-            # Show average episode reward every 10 episodes
-            if episode % 10 == 0:
-                pass  # print(f'Episode {i}: average reward: {avg_reward}')
-
-            if running_reward > self.par.reward_threshold:
-                break
-
-            yield memory
 
 
 
-        #self.lock.release()
+def tf_env_step(env, action: tf.Tensor) -> List[tf.Tensor]:
 
-        print(f'\nSolved at episode {episode}: average reward: {running_reward:.2f}!')
+    def env_step(action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Returns state, reward and done flag given an action."""
 
+        state, reward, done, _ = env.step(action)
+        return (state.astype(np.float32),
+                np.array(reward, np.int32),
+                np.array(done, np.int32))
+
+    return tf.numpy_function(env_step, [action],
+                           [tf.float32, tf.int32, tf.int32])
+
+
+
+def policy_runner(env, model, max_steps_episode=20):
+
+    state = tf.constant(env.reset(), dtype=tf.float32)
+
+    initial_state_shape = state.shape
+
+    mem = utils.Pipeline()
+
+    for t in tf.range(max_steps_episode):
+
+        # Add outer barch axis for state
+
+        state = tf.expand_dims(state, 0)
+
+        # Run the model to get Q values for each action and critical values
+        logits_a, critic_val = model(state)
+
+        # Sampling action from its probability distribution
+        action = tf.random.categorical(logits_a, 1)[0,0]
+
+        # Applying action to get next state and reward
+        state, reward, done = tf_env_step(env, action)
+
+        state.set_shape(initial_state_shape)
+
+        mem.store(state, action, reward, done)
+
+    return mem
 class Runner(Thread):
 
     def __init__(self, env, par, model, trainer):
@@ -270,7 +284,6 @@ class Runner(Thread):
 
         mem = self.collect_data()
         for i in range(self.max_steps_episode):
-        #while True:
             self.queue.put(next(mem), timeout=10.0)
             self.queue.task_done()
 
@@ -314,17 +327,10 @@ class A3C:
         self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
         #self.logits_a, self.prob_a, self.action, self.critic_val, self.entropies = self.setup_localmodel(self.inputs)
 
-        #setup tensors for training data
-        self.prob_action = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.critic_values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.rewards = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
-        self.entropies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.terminal = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
-        self.states = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-
 
         #Calculate loss
-        self.exp_rewards = tf.zeros_like(self.critic_val)
+
+        #self.exp_rewards = tf.zeros_like(self.critic_val)
         #self.loss = self.compute_loss(self.prob_a, self.critic_val, self.exp_rewards, self.entropies)
 
 
@@ -337,48 +343,72 @@ class A3C:
 
     def sample_action(self, logits):
 
-        action = tf.random.categorical(logits, 1)[0,0]
+        action = tf.random.categorical(logits, 1)[:,0]
         prob = tf.nn.softmax(logits)
 
 
         return action, prob
 
-    def setup_localmodel(self, states, rewards):
+    def setup_localmodel(self, states):
 
 
-        for i, state in enumerate(states):
-            # Run the model to get Q values for each action and critical values
-            logits_a, critic_val = self.local_model(state)
-            # Sampling action from its probability distribution
-            action, prob_a = self.sample_action(logits_a)
-            entropy = self.trainer.produce_entropy(prob_a, logits_a)
-            c_val = tf.squeeze(critic_val)
 
-            self.prob_action = self.prob_action.write(i, prob_a[0, action])
-            self.critic_values = self.critic_values.write(i, tf.squeeze(critic_val))
-            self.entropies = self.entropies.write(i, entropy)
-            self.rewards = self.rewards.write(i, rewards[i])
-
-        self.prob_action, self.critic_values, self.entropies, self.rewards \
-            = utils.to_stack(self.prob_action, self.critic_values, self.entropies, self.rewards)
+        # Run the model to get Q values for each action and critical values
+        logits_a, critic_val = self.local_model(states)
+        # Sampling action from its probability distribution
+        action, prob_a = self.sample_action(logits_a)
+        entropy = self.trainer.produce_entropy(prob_a, logits_a)
+        critic_val = tf.squeeze(critic_val)
 
 
-        #return logits_a, prob_a, action, c_val, entropy
+        action = action.numpy()
+        prob_a = prob_a.numpy()
+        prob_a = [prob_a[i, act] for i, act in enumerate(action)]
+        prob_a = tf.convert_to_tensor(prob_a, dtype=tf.float32)
 
-    def compute_loss(self):
+        critic_val = tf.convert_to_tensor(critic_val, dtype=tf.float32)
+        entropy = tf.convert_to_tensor(entropy, dtype=tf.float32)
+
+        return logits_a, prob_a, action, critic_val, entropy
+
+    def get_expected_rewards(self, rewards):
+
+        # Transformed data into tensor shapes
+        total_reward = tf.constant(0.0)
+        total_reward_shape = total_reward.shape
+        T = tf.shape(rewards)[0]
+        exp_rewards = tf.TensorArray(dtype=tf.float32, size=T)
+
+        # Accumalate the rewards from the end
+        rewards = tf.cast(rewards[::-1], dtype=tf.float32)
+        for t in tf.range(T):
+            total_reward = rewards[t] + self.par.gamma * total_reward
+            total_reward.set_shape(total_reward_shape)
+            exp_rewards = exp_rewards.write(t, total_reward)
+        exp_rewards = exp_rewards.stack()[::-1]
+
+        return exp_rewards
+
+    def huber_loss(self, rewards, values):
+
+        huber = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
+
+        return huber(rewards, values)
+
+    def compute_loss(self, prob_a, c_val, exp_rewards, entropies):
 
 
         # Convert training data to appropriate TF tensor shapes
-        prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(prob_a,
-                                                                            critic_values,
-                                                                            exp_rewards,
+        prob_a, critic_values, exp_rewards, entropies = utils.insert_axis1Tensor(prob_a,
+                                                                                  exp_rewards,
+                                                                            c_val,
                                                                             entropies)
 
         advantage = exp_rewards - critic_values
-        log_prob = tf.math.log(action_probs)
+        log_prob = tf.math.log(prob_a)
 
         actor_loss = -tf.math.reduce_sum(log_prob * advantage)
-        critic_loss = self.trainer.huber_loss(exp_rewards, critic_values) - self.par.betta * entropies
+        critic_loss = self.huber_loss(exp_rewards, critic_values) - self.par.betta * entropies
 
         loss = actor_loss + critic_loss
 
@@ -400,7 +430,7 @@ class A3C:
         que_data = que.get()
         while not que.empty():
 
-            que_data.concat(que.get())
+            que_data.extend(que.get())
 
         return que_data
 
