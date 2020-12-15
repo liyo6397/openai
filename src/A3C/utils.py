@@ -117,16 +117,20 @@ class Memory():
         self.entropies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         self.terminal = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
         self.states = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.actions = []
+        self.actions = tf.TensorArray(dtype=tf.int64, size=0, dynamic_size=True)
 
 
-    def experiance(self, state, action, reward, entropy):
+    def experiance(self, t, state, action, reward, done):
 
-        self.action = action
-        self.reward = reward
-        self.state = state
-        self.entropy = entropy
-        self.actions += [action]
+        self.states = self.states.write(t, state)
+        self.actions = self.actions.write(t, action)
+        self.rewards = self.rewards.write(t, reward)
+        self.done = done
+        #self.action = action
+        #self.reward = reward
+        #self.state = state
+        #self.entropy = entropy
+        #self.actions += [action]
 
 
 
@@ -140,23 +144,33 @@ class Memory():
 
     def to_stack(self):
 
-        self.prob_action = self.prob_action.stack()
-        self.critic_values = self.critic_values.stack()
-        self.rewards = self.rewards.stack()
-        self.entropies = self.entropies.stack()
-        self.terminal = self.terminal.stack()
         self.states = self.states.stack()
+        self.actions = self.actions.stack()
+        self.rewards = self.rewards.stack()
+
+        #self.prob_action = self.prob_action.stack()
+        #self.critic_values = self.critic_values.stack()
+        #self.rewards = self.rewards.stack()
+        #self.entropies = self.entropies.stack()
+        #self.terminal = self.terminal.stack()
+        #self.states = self.states.stack()
 
     def concat(self, other):
 
-        self.prob_action = tf.concat([self.prob_action, other.prob_action], 0)
+
+        self.states =  tf.concat([self.states, other.states], 0)
+        self.actions = tf.concat([self.actions, other.states], 0)
+        self.rewards = tf.concat([self.rewards, other.rewards], 0)
+        self.entropies = tf.concat([self.entropies, other.entropies], 0)
+
+        '''self.prob_action = tf.concat([self.prob_action, other.prob_action], 0)
         self.critic_values = tf.concat([self.critic_values, other.critic_values], 0)
         self.rewards = tf.concat([self.rewards, other.rewards], 0)
         self.entropies = tf.concat([self.entropies, other.entropies], 0)
         self.terminal = tf.concat([self.terminal, other.terminal], 0)
 
         self.actions.extend(other.actions)
-        self.states.extend(other.states)
+        self.states.extend(other.states)'''
 
 
 

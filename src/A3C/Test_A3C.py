@@ -494,52 +494,38 @@ class Test_A3Cclass(unittest.TestCase):
 
     def test_setup_localModel(self):
 
-        model = self.A3C.local_model
-        a3c_trainer = trainer(self.env, self.par)
+        #a3c = A3C(self.par.env_name, self.par)
+        #que_data = policy_runner(self.env, self.A3C.local_model)
 
-        memory = policy_runner(self.env, model)
-        print("states: ", np.array(memory.states).shape)
-        #print("inputs for global model: ", self.A3C.inputs)
-        #logits_a, prob_a, action, c_val , entropies= self.A3C.setup_localmodel(memory.states)
-        '''print("logits: ", logits_a)
-        print("Probability of a: ", prob_a)
-        print("Action: ", action)
-        print("Critical values: ", c_val)
-        print("Entropies: ", entropies)'''
+        for i in range(2):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=i)
 
-    def test_localmodel_expectedRewards(self):
+        que_data = a3c.get_queue()
 
-        model = self.A3C.local_model
-        a3c_trainer = trainer(self.env, self.par)
-
-        memory = a3c_trainer.explore(0, model)
-        print("states: ", memory.states.shape)
-        logits_a, prob_a, action, c_val, entropies = self.A3C.setup_localmodel(memory.states)
-        exp_rewards = self.A3C.get_expected_rewards(memory.rewards)
+        logits_a, prob_a, action, c_val , entropies= a3c.setup_localmodel(que_data.states)
+        exp_rewards = self.A3C.get_expected_rewards(que_data.rewards)
         print("Expected Rewards: ", exp_rewards)
-
+        print("logits: ", logits_a)
         print("Probability of a: ", prob_a)
         print("Action: ", action)
         print("Critical values: ", c_val)
         print("Entropies: ", entropies)
 
 
-        #loss = self.A3C.compute_loss(prob_a, c_val, exp_rewards, entropies, action)
-
-        #print("Loss: ", loss)
-
     def test_localmodel_loss(self):
 
-        model = self.A3C.local_model
-        a3c_trainer = trainer(self.env, self.par)
+        for i in range(2):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=i)
 
-        memory = a3c_trainer.explore(0, model)
+        que_data = a3c.get_queue()
 
-        logits_a, prob_a, action, c_val, entropies = self.A3C.setup_localmodel(memory.states)
-        exp_rewards = self.A3C.get_expected_rewards(memory.rewards)
+        logits_a, prob_a, action, c_val, entropies = a3c.setup_localmodel(que_data.states)
+        exp_rewards = a3c.get_expected_rewards(que_data.rewards)
 
 
-        loss = self.A3C.compute_loss(prob_a, c_val, exp_rewards, entropies)
+        loss = a3c.compute_loss(prob_a, c_val, exp_rewards, entropies)
 
         print("Loss: ", loss)
 

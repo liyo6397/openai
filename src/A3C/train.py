@@ -220,14 +220,13 @@ def tf_env_step(env, action: tf.Tensor) -> List[tf.Tensor]:
 
 
 
-def policy_runner(env, model, max_steps_episode=20):
+def policy_runner(env, model, max_steps_episode=5):
 
     state = tf.constant(env.reset(), dtype=tf.float32)
 
     initial_state_shape = state.shape
 
-    mem = utils.Pipeline()
-
+    mem = utils.Memory()
     for t in tf.range(max_steps_episode):
 
         # Add outer barch axis for state
@@ -241,11 +240,14 @@ def policy_runner(env, model, max_steps_episode=20):
         action = tf.random.categorical(logits_a, 1)[0,0]
 
         # Applying action to get next state and reward
-        state, reward, done = tf_env_step(env, action)
+        next_state, reward, done = tf_env_step(env, action)
 
-        state.set_shape(initial_state_shape)
+        #state.set_shape(initial_state_shape)
+        state = next_state
 
-        mem.store(state, action, reward, done)
+        mem.experiance(t, state, action, reward, done)
+
+    mem.to_stack()
 
     return mem
 class Runner(Thread):
@@ -275,7 +277,8 @@ class Runner(Thread):
 
         episode = 0
         while True:
-            mem = self.trainer.explore(episode, self.model)
+            #mem = self.trainer.explore(episode, self.model)
+            mem = policy_runner(self.env, self.model)
             episode += 1
             yield mem
 
@@ -430,7 +433,7 @@ class A3C:
         que_data = que.get()
         while not que.empty():
 
-            que_data.extend(que.get())
+            que_data.concat(que.get())
 
         return que_data
 
