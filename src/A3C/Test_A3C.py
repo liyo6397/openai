@@ -505,7 +505,7 @@ class Test_A3Cclass(unittest.TestCase):
 
         logits_a, prob_a, action, c_val , entropies= a3c.setup_localmodel(que_data.states)
         exp_rewards = self.A3C.get_expected_rewards(que_data.rewards)
-        print("Expected Rewards: ", exp_rewards)
+        print("Rewards: ", que_data.rewards)
         print("logits: ", logits_a)
         print("Probability of a: ", prob_a)
         print("Action: ", action)
@@ -528,6 +528,24 @@ class Test_A3Cclass(unittest.TestCase):
         loss = a3c.compute_loss(prob_a, c_val, exp_rewards, entropies)
 
         print("Loss: ", loss)
+
+    def test_selfgrad(self):
+
+        a3c = A3C(self.par.env_name, self.par)
+        grads, episode_reward = a3c.grad_descent(a3c.inputs, a3c.rewards)
+        a3c.sync_weights(grads)
+
+    def test_threadGrad(self):
+
+        for i in range(2):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=i)
+
+        # que_data = a3c.get_queue()
+        grads, episode_reward = a3c.grad_descent(a3c.inputs, a3c.rewards)
+        a3c.sync_weights(grads)
+
+
 
 
 

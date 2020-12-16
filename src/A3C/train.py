@@ -252,7 +252,7 @@ def policy_runner(env, model, max_steps_episode=5):
     return mem
 class Runner(Thread):
 
-    def __init__(self, env, par, model, trainer):
+    def __init__(self, env, par, model):
         super().__init__()
         self.queue = queue.Queue()
         self.num_process = par.num_process
@@ -264,7 +264,6 @@ class Runner(Thread):
         self.queue = queue.Queue()
         self.num_episodes = self.par.num_episodes
         self.max_steps_episode = self.par.max_steps_episode
-        #self.trainer = trainer(self.env, self.optimizer, self.par, self.global_model)
         self.trainer = trainer
 
 
@@ -319,26 +318,23 @@ class A3C:
         self.set_seed(self.env)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
 
-        #set up global model
+        #set up model
         self.global_model = Networks(self.env.action_space.n, agent_history_length=4)
         inputs_shape = utils.nn_input_shape(game_name, atari=True)
         self.inputs = tf.random.normal(inputs_shape)
-        self.global_model(self.inputs)
-
-        #set up local model
-        self.trainer = trainer(self.env, self.par)
+        logits, c_val = self.global_model(self.inputs)
         self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
-        #self.logits_a, self.prob_a, self.action, self.critic_val, self.entropies = self.setup_localmodel(self.inputs)
 
-
-        #Calculate loss
-
-        #self.exp_rewards = tf.zeros_like(self.critic_val)
-        #self.loss = self.compute_loss(self.prob_a, self.critic_val, self.exp_rewards, self.entropies)
 
 
         #set up workers
-        self.runner = Runner(self.env, par, self.local_model, self.trainer)
+        self.runner = Runner(self.env, par, self.local_model)
+
+        # set up local model
+        self.rewards = tf.constant([0., 0., 0., 0., 0.])
+        #grads = self.grad_descent(self.inputs, self.rewards)
+        # copy weights from the parameter server to the local model
+        #self.sync_weights(grads)
 
         # For recording results
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
@@ -360,7 +356,7 @@ class A3C:
         logits_a, critic_val = self.local_model(states)
         # Sampling action from its probability distribution
         action, prob_a = self.sample_action(logits_a)
-        entropy = self.trainer.produce_entropy(prob_a, logits_a)
+        entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob_a, logits=logits_a)
         critic_val = tf.squeeze(critic_val)
 
 
@@ -437,26 +433,26 @@ class A3C:
 
         return que_data
 
-    def grad_descent(self):
+    def grad_descent(self, states, rewards):
 
         with tf.GradientTape() as tape:
-            # Collect data from runner
-            que_data = self.get_queue()
+
+            logits_a, prob_a, action, c_val, entropies = self.setup_localmodel(states)
 
             # Calculatr expected rewards for each time step
-            exp_rewards = self.trainer.get_expected_rewards(que_data.rewards)
+            exp_rewards = self.get_expected_rewards(rewards)
 
 
             # Convert training data to appropriate TF tensor shapes
-            prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(que_data.prob_action,
-                                                                                que_data.critic_values,
+            prob_a, c_values, exp_rewards, entropies = utils.insert_axis1Tensor(prob_a,
+                                                                                c_val,
                                                                                 exp_rewards,
-                                                                                que_data.entropies)
+                                                                                entropies)
 
-            loss = self.trainer.compute_loss(prob_a, c_values, exp_rewards, entropies)
+            loss = self.compute_loss(prob_a, c_values, exp_rewards, entropies)
 
         grads = tape.gradient(loss, self.local_model.trainable_variables)
-        episode_reward = tf.math.reduce_sum(que_data.rewards)
+        episode_reward = tf.math.reduce_sum(rewards)
 
 
 
