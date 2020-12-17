@@ -463,6 +463,12 @@ class A3C:
         self.optimizer.apply_gradients(zip(grads, self.global_model.trainable_variables))
         self.local_model.set_weights(self.global_model.get_weights())
 
+    def process(self):
+
+        que_data = self.get_queue()
+        grads, episode_reward = self.grad_descent(que_data.states, que_data.rewards)
+        self.sync_weights(grads)
+
 
 
 

@@ -159,9 +159,9 @@ class Memory():
 
 
         self.states =  tf.concat([self.states, other.states], 0)
-        self.actions = tf.concat([self.actions, other.states], 0)
+        self.actions = tf.concat([self.actions, other.actions], 0)
         self.rewards = tf.concat([self.rewards, other.rewards], 0)
-        self.entropies = tf.concat([self.entropies, other.entropies], 0)
+        #self.entropies = tf.concat([self.entropies, other.entropies], 0)
 
         '''self.prob_action = tf.concat([self.prob_action, other.prob_action], 0)
         self.critic_values = tf.concat([self.critic_values, other.critic_values], 0)

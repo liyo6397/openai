@@ -10,6 +10,8 @@ from time import sleep
 import tqdm
 import numpy as np
 import queue
+from worker import create_cluster
+
 class Test_par:
     def __init__(self):
         self.env_name = "BreakoutNoFrameskip-v4"
@@ -541,9 +543,30 @@ class Test_A3Cclass(unittest.TestCase):
             a3c = A3C(self.par.env_name, self.par)
             a3c.start(threadID=i)
 
-        # que_data = a3c.get_queue()
-        grads, episode_reward = a3c.grad_descent(a3c.inputs, a3c.rewards)
+        que_data = a3c.get_queue()
+        grads, episode_reward = a3c.grad_descent(que_data.states, que_data.rewards)
         a3c.sync_weights(grads)
+
+    def test_cluster(self):
+
+        cluster = create_cluster(2, 2)
+
+        cluster_spec = tf.train.ClusterSpec(cluster)
+
+        print(cluster_spec)
+
+    def test_distributeServer(self):
+
+
+        for i in range(5):
+            a3c = A3C(self.par.env_name, self.par)
+            a3c.start(threadID=i)
+            a3c.process()
+
+
+
+
+
 
 
 
