@@ -10,7 +10,7 @@ from time import sleep
 import tqdm
 import numpy as np
 import queue
-from worker import create_cluster
+from worker import cluster
 
 class Test_par:
     def __init__(self):
@@ -562,6 +562,17 @@ class Test_A3Cclass(unittest.TestCase):
             a3c = A3C(self.par.env_name, self.par)
             a3c.start(threadID=i)
             a3c.process()
+
+    def test_configPo(self):
+
+        clusters = cluster(3, 2)
+
+        config = clusters.setup_config()
+        print(config)
+
+
+
+
 
 
 

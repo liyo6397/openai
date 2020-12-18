@@ -6,6 +6,7 @@ from actor_critic import A3C, visualization
 from train import trainer
 import utils
 import portpicker
+import multiprocessing
 
 
 
@@ -25,17 +26,51 @@ class parameters:
         self.gamma = 0.99 # discount factor for accumulating reward
         self.betta = 0.01 # strength of the entropy
 
-def create_cluster(num_worker, num_process):
-    """Creates and starts local servers and returns the cluster_resolver."""
-    worker_ports = [portpicker.pick_unused_port()for _ in range(num_worker)]
-    ps_ports = [portpicker.pick_unused_port() for _ in range(num_process)]
+class cluster:
 
-    #worker and parameter server need to know which port they need to listen to
-    cluster = {}
-    cluster['worker'] = [f'host:{port}' for port in worker_ports]
-    cluster['process'] = [f'host:{port}' for port in ps_ports]
+    def __init__(self, num_worker, num_process):
+        self.num_worker = num_worker
+        self.num_process = num_process
+        self.config = self.setup_config()
 
-    return cluster
+
+
+    def create_cluster(self):
+        """Creates and starts local servers and returns the cluster_resolver."""
+        worker_ports = [portpicker.pick_unused_port()for _ in range(self.num_worker)]
+        ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
+
+        #worker and parameter server need to know which port they need to listen to
+        cluster = {}
+        cluster['worker'] = [f'host:{port}' for port in worker_ports]
+        cluster['process'] = [f'host:{port}' for port in ps_ports]
+
+        return cluster
+
+    def setup_config(self):
+
+        worker_config = tf.compat.v1.ConfigProto()
+        #if multiprocessing.cpu_count() < self.num_worker + 1:
+        #    worker_config.inter_op_parallelism_threads = self.num_worker + 1
+        worker_config.inter_op_parallelism_threads = 1
+
+        return worker_config
+
+    def run(self, cluster):
+
+        cluster_spec = tf.train.ClusterSpec(cluster)
+
+        for i in range(self.num_worker):
+            tf.distribute.Server(cluster_spec, job_name="worker", task_index=i, config=self.config, protocol="grpc")
+
+        for i in range(self.num_process):
+            tf.distribute.Server(cluster_spec, job_name="process", task_index=i, protocol="grpc")
+
+
+
+
+
+
 
 
 
