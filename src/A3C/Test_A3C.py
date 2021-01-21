@@ -10,6 +10,7 @@ from time import sleep
 import tqdm
 import numpy as np
 import queue
+import worker
 from worker import cluster
 
 class Test_par:
@@ -339,8 +340,9 @@ class Test_A3Cclass(unittest.TestCase):
 
         self.par = Test_par()
         self.env = gym.make(self.par.env_name)
-        self.A3C = A3C(self.par.env_name, self.par)
+        #self.A3C = A3C(self.par.env_name, self.par)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+        self.num_episodes = 10
 
     def test_runner(self):
 
@@ -549,16 +551,24 @@ class Test_A3Cclass(unittest.TestCase):
 
     def test_cluster(self):
 
-        cluster = create_cluster(2, 2)
+        clusters = cluster(2, 2)
 
-        cluster_spec = tf.train.ClusterSpec(cluster)
+        cluster_set = clusters.create_cluster(job_name='worker')
 
-        print(cluster_spec)
+        print("cluster_set: ",cluster_set)
+
+        #cluster_spec = tf.train.ClusterSpec(cluster_set)
+        #worker_server, ps_server, resolver=clusters.create_server(cluster_set)
+
+        #print("worker server: ",worker_server)
+        #print("ps server: ",ps_server)
+
+        #print(cluster_spec)
 
     def test_distributeServer(self):
 
 
-        for i in range(5):
+        for i in range(3):
             a3c = A3C(self.par.env_name, self.par)
             a3c.start(threadID=i)
             a3c.process()
@@ -569,6 +579,38 @@ class Test_A3Cclass(unittest.TestCase):
 
         config = clusters.setup_config()
         print(config)
+
+    def test_cluster_resolver(self):
+
+        clusters = cluster(3, 2)
+        cluster_dict = clusters.create_cluster()
+
+        resolver = clusters.create_server(cluster_dict)
+
+        print(resolver)
+
+    def test_strategy(self):
+
+        clusters = cluster(3, 2)
+        cluster_dict = clusters.create_cluster()
+        resolver = clusters.create_server(cluster_dict)
+        reduce = clusters.run(resolver)
+
+        print("reduce: ",reduce)
+
+    def test_trainingLoop(self):
+
+        clusters = cluster(3, 2)
+        cluster_dict = clusters.create_cluster()
+        resolver = clusters.create_server(cluster_dict)
+
+        worker.run(resolver, num_episodes=10)
+
+    def test_tfconfig(self):
+
+        worker.run(num_episodes=10)
+
+
 
 
 

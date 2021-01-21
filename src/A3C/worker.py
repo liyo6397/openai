@@ -2,11 +2,12 @@ import gym
 import tqdm
 import tensorflow as tf
 from model import Networks
-from actor_critic import A3C, visualization
-from train import trainer
+from train import trainer, A3C
 import utils
 import portpicker
 import multiprocessing
+import os
+import json
 
 
 
@@ -28,22 +29,23 @@ class parameters:
 
 class cluster:
 
-    def __init__(self, num_worker, num_process):
+    def __init__(self, num_worker=2, num_process=2):
         self.num_worker = num_worker
         self.num_process = num_process
         self.config = self.setup_config()
 
 
 
-    def create_cluster(self):
+
+    def create_cluster(self, job_name):
         """Creates and starts local servers and returns the cluster_resolver."""
         worker_ports = [portpicker.pick_unused_port()for _ in range(self.num_worker)]
-        ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
+        #ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
 
         #worker and parameter server need to know which port they need to listen to
         cluster = {}
-        cluster['worker'] = [f'host:{port}' for port in worker_ports]
-        cluster['process'] = [f'host:{port}' for port in ps_ports]
+        cluster[f'{job_name}'] = [f'host:{port}' for port in worker_ports]
+        #cluster['process'] = [f'host:{port}' for port in ps_ports]
 
         return cluster
 
@@ -56,52 +58,75 @@ class cluster:
 
         return worker_config
 
-    def run(self, cluster):
+    def create_server(self, cluster):
 
         cluster_spec = tf.train.ClusterSpec(cluster)
 
         for i in range(self.num_worker):
-            tf.distribute.Server(cluster_spec, job_name="worker", task_index=i, config=self.config, protocol="grpc")
+            worker_server = tf.distribute.Server(cluster_spec, job_name="worker", task_index=i, config=self.config, protocol="grpc")
 
         for i in range(self.num_process):
-            tf.distribute.Server(cluster_spec, job_name="process", task_index=i, protocol="grpc")
+            ps_server = tf.distribute.Server(cluster_spec, job_name="process", task_index=i, protocol="grpc")
+
+        cluster_resolver = tf.distribute.cluster_resolver.SimpleClusterResolver(
+            cluster_spec, rpc_layer="grpc")
+        return worker_server, ps_server, cluster_resolver
+
+    def ParametersServerStrategy(self, cluster_resolver):
+
+        #scale up model training on multiple machines
+        #variable_partitioner = (
+        #    tf.distribute.experimental.partitioners.FixedShardsPartitioner(
+        #        num_shards=self.num_process))
+
+        strategy = tf.distribute.experimental.ParameterServerStrategy(
+            cluster_resolver)
+
+        return strategy
+
+    def setup_distributed(self, job_name):
+
+        cluster_dict = self.create_cluster(job_name)
+        os.environ["TF_CONFIG"] = json.dumps({'clusters': cluster_dict,
+                                                         'task': {'type': 'worker', 'index': 0}})
 
 
+@tf.function
+def distributed_train_step(train_step, strategy):
+    per_replica_losses = strategy.run(train_step)
+    return strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                               axis=None)
+def check_point_dir():
+    # Create a checkpoint directory to store the checkpoints.
+    checkpoint_dir = './training_checkpoints'
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 
+    return checkpoint_prefix
 
+def run(num_episodes=10):
 
+    clusters = cluster(2,2)
 
+    clusters.setup_distributed(job_name='worker')
 
-
-
-if __name__ == "__main__":
-
+    strategy = tf.distribute.experimental.MultiWorkerMirroredStrategy()
     par = parameters()
-    # gym environment
     env = gym.make(par.env_name)
-    num_action = env.action_space.n
-    max_steps_episode = par.max_steps_episode
 
 
-    #class import
-    model = Networks(num_action, agent_history_length=4)
-    optimizer = tf.keras.optimizers.Adam(learning_rate=par.learning_rate)
-    a3c = A3C()
-    trainer = trainer(env, model, optimizer, par)
+    with strategy.scope():
+        optimizer = tf.keras.optimizers.Adam(learning_rate=par.learning_rate)
+        model = Networks(env.action_space.n, agent_history_length=4)
 
-    #set up threads
-    threads = utils.create_threads(trainer, par.num_process)
-    process = []
+        a3c = A3C(par, model, optimizer)
 
-    for thread in threads:
-        thread.start()
-        process.append(thread)
+        a3c.start()
 
-    # Wait for all threads to complete
-    for t in process:
-        t.join()
 
-    visual = visualization(env)
-    visual.create_images(model, a3c, par.max_steps_episode)
-    visual.save_image(image_file=f'{par.env_name}.gif')
+    for epoch in range(num_episodes):
+        per_replica_loss = distributed_train_step(a3c.process, strategy)
+
+        if epoch%2 == 0:
+            print(f'Step {epoch}-Loss{per_replica_loss}')
+
 

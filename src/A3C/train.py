@@ -311,19 +311,23 @@ class Runner(Thread):
 
 class A3C:
 
-    def __init__(self, game_name, par):
+    def __init__(self, par, model, optimizer):
 
         self.par = par
-        self.env = gym.make(game_name)
+        self.env = gym.make(par.env_name)
         self.set_seed(self.env)
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+        #self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.par.learning_rate)
+        self.optimizer = optimizer
 
         #set up model
         self.global_model = Networks(self.env.action_space.n, agent_history_length=4)
-        inputs_shape = utils.nn_input_shape(game_name, atari=True)
+        #self.global_model = model
+        inputs_shape = utils.nn_input_shape(par.env_name, atari=True)
         self.inputs = tf.random.normal(inputs_shape)
         logits, c_val = self.global_model(self.inputs)
-        self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
+        #self.local_model = Networks(self.env.action_space.n, agent_history_length=4)
+        self.local_model = model
+
 
 
 
@@ -332,9 +336,9 @@ class A3C:
 
         # set up local model
         self.rewards = tf.constant([0., 0., 0., 0., 0.])
-        #grads = self.grad_descent(self.inputs, self.rewards)
+        #self.grads = self.grad_descent(self.inputs, self.rewards)
         # copy weights from the parameter server to the local model
-        #self.sync_weights(grads)
+        #self.sync_weights()
 
         # For recording results
         self.loss_metric = tf.keras.metrics.Mean('loss', dtype=tf.float32)
@@ -359,8 +363,9 @@ class A3C:
         entropy = tf.nn.softmax_cross_entropy_with_logits(labels=prob_a, logits=logits_a)
         critic_val = tf.squeeze(critic_val)
 
-
+        print("action: ",action)
         action = action.numpy()
+
         prob_a = prob_a.numpy()
         prob_a = [prob_a[i, act] for i, act in enumerate(action)]
         prob_a = tf.convert_to_tensor(prob_a, dtype=tf.float32)
@@ -419,7 +424,7 @@ class A3C:
         tf.random.set_seed(seed)
         np.random.seed(seed)
 
-    def start(self, threadID):
+    def start(self, threadID=0):
         self.runner.start_runner(threadID)
 
     def get_queue(self):
@@ -456,7 +461,7 @@ class A3C:
 
 
 
-        return grads, episode_reward
+        return grads, episode_reward, loss
 
     def sync_weights(self, grads):
         # Sync local model weights with global model
@@ -466,8 +471,10 @@ class A3C:
     def process(self):
 
         que_data = self.get_queue()
-        grads, episode_reward = self.grad_descent(que_data.states, que_data.rewards)
+        grads, episode_reward, loss = self.grad_descent(que_data.states, que_data.rewards)
         self.sync_weights(grads)
+
+        return loss
 
 
 
