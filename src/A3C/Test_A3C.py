@@ -608,7 +608,15 @@ class Test_A3Cclass(unittest.TestCase):
 
     def test_tfconfig(self):
 
-        worker.run(num_episodes=10)
+        clusters = cluster(2, 2)
+
+        clusters.setup_distributed()
+
+
+        strategy = clusters.ParametersServerStrategy()
+
+        print(strategy)
+
 
 
 

@@ -37,17 +37,27 @@ class cluster:
 
 
 
-    def create_cluster(self, job_name):
+    def create_cluster(self):
         """Creates and starts local servers and returns the cluster_resolver."""
         worker_ports = [portpicker.pick_unused_port()for _ in range(self.num_worker)]
-        #ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
+        ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
 
         #worker and parameter server need to know which port they need to listen to
         cluster = {}
-        cluster[f'{job_name}'] = [f'host:{port}' for port in worker_ports]
-        #cluster['process'] = [f'host:{port}' for port in ps_ports]
+        cluster['worker'] = [f"localhost:{port}" for port in worker_ports]
+        cluster['process'] = [f'localhost:{port}' for port in ps_ports]
+
 
         return cluster
+
+    def unused_port(self, num_port):
+
+        worker_ports = [portpicker.pick_unused_port() for _ in range(self.num_worker)]
+        ps_ports = [portpicker.pick_unused_port() for _ in range(self.num_process)]
+
+        return worker_ports, ps_ports
+
+
 
     def setup_config(self):
 
@@ -72,24 +82,34 @@ class cluster:
             cluster_spec, rpc_layer="grpc")
         return worker_server, ps_server, cluster_resolver
 
-    def ParametersServerStrategy(self, cluster_resolver):
 
-        #scale up model training on multiple machines
-        #variable_partitioner = (
-        #    tf.distribute.experimental.partitioners.FixedShardsPartitioner(
-        #        num_shards=self.num_process))
 
-        strategy = tf.distribute.experimental.ParameterServerStrategy(
-            cluster_resolver)
+    def setup_distributed(self):
+
+        #w_ports, p_ports = self.create_cluster(job_name)
+        cluster_dict = self.create_cluster()
+
+        os.environ['TF_CONFIG'] = json.dumps({
+            'cluster': {
+
+                'worker': cluster_dict['worker'],
+                "ps": cluster_dict['process'],
+            },
+            'task': {'type': 'worker', 'index': 0}
+        })
+
+    def ParametersServerStrategy(self):
+
+
+
+        cluster_resolver = tf.distribute.cluster_resolver.TFConfigClusterResolver()
+
+        if cluster_resolver.task_type == 'worker':
+
+            strategy = tf.distribute.experimental.ParameterServerStrategy(
+            cluster_resolver=cluster_resolver)
 
         return strategy
-
-    def setup_distributed(self, job_name):
-
-        cluster_dict = self.create_cluster(job_name)
-        os.environ["TF_CONFIG"] = json.dumps({'clusters': cluster_dict,
-                                                         'task': {'type': 'worker', 'index': 0}})
-
 
 @tf.function
 def distributed_train_step(train_step, strategy):
@@ -102,6 +122,8 @@ def check_point_dir():
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 
     return checkpoint_prefix
+
+
 
 def run(num_episodes=10):
 
